@@ -26,6 +26,12 @@
 - **验证**：不适用（零代码改动，未编译；trace 复跑证据见 `tmp/bugfix-shots/issue214-kwin.log` 行 7-26 失配帧、行 39-51 收敛帧对照）。下轮建议：把 trace 场景改成双面板同表面（一个 `visible: false` 面板 + 一个可见面板，复刻桌面 stage 结构）复跑 trace——若静止态仍打 "does not match"，即证实隐藏面板 region 泄漏，最小修复在客户端让隐藏面板的 blur Region 与 shape 同步停发（或 Region 随 visible 置空）；若静止态匹配，则改查真实 shell 壁纸预览打开瞬间的 scale 动画与 SurfaceShape 失步（补连 scaleChanged 一行级修复）。
 - **残留风险**：trace 场景是单面板合成复现，真实 shell 的永久失配假设未经运行验证；`declaredShapeMatchesRegion` 失配期间"region 驱动帧完全无 AA"这一缺陷本身无论触发源如何都成立，但它的最小修复（AA 化 region 路径）涉及 mesh/着色器管线，超出时间闸。
 
+### 108. [第 110 轮] [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 状态机走读闭合、失败点收敛到"卡住的 inhibitor"，未修（超时闸收尾，2026-10-19）
+- **定位（承接待修清单第 2 项；#214 按第 106 条结论需真实会话 trace 才能推进，本轮顺延处理 #200）**：完整走读智能隐藏管线（DockAutoHideController.qml 状态机 / DockAutoHideMath.mjs 冲突与策略 / DockRevealHandle.qml + DockRevealGeometry.mjs 命中区 / DockWindow.qml mask 并集与 hoverHitRegion / DockContainer.qml `_pointerHeld` 宽限期）。全屏场景推演：全屏窗口在目标屏 ⇒ `hasConflict` 无条件 true（DockAutoHideMath.mjs:148-149）⇒ `policyWantsHidden=true`，dock 唯一可见途径是 inhibitor（边缘 2px 条 hover → RevealPending → 90ms → 动画 → `_onAnimationFinished` 因 `handleHovered=true` 落 "Held"，DockAutoHideController.qml:200-216）。随后指针缓慢移出应走：corridor 命中区退出（`handleExited` → `_handleHovered=false`）→ dock 体退出（`_dockPointerHover.hovered=false` → 80ms `hoverExitTimer` 宽限 → `pointerInside=false`）→ Held 分支 `shouldBeVisible=false` → HidePending(200ms) → Hiding → Hidden。**纸面推演每条退出路径都闭合**，故运行时"不隐藏"必有某个 inhibitor 卡死，候选按嫌疑排序：(a) `pointerInsideDock` 卡死——`hoverHitRegion`（DockWindow.qml:365-372）在 `pointerInside && revealProgress>0` 时把输入 mask 扩到 dock 上方 `hoverHeadroom` 带 + `effectiveHoverScale` 水平扩展带，而 `_dockPointerHover` 挂在整个 window contentItem 上（DockContainer.qml:465-466），指针停在dock 上方这条**不可见 hover 包络内**任意一点都会持续刷新 hovered ⇒ `pointerInside` 永真 ⇒ Held 永不退出；无冲突时这是正常的放大余量行为，**只有全屏冲突（Held 相位）下才表现为 bug**，与"全屏"限定吻合；快移一步跨出包络 ⇒ 正常隐藏，慢移在包络内停留 ⇒ 不隐藏，与"缓慢"限定吻合。(b) `_handleHovered` 卡死——corridor 的 HoverHandler 在输入 mask 动态变化时的 exited 事件是否可靠未验证。另注：`_pointerHeld` 宽限与 `_evaluateInteraction` 立即派发均为 7f4a74b（2026-10-13）引入，issue #200 报告时间线吻合，回归窗口可疑。
+- **修复**：无（两个候选都需要运行时证据区分：改 (a) 会动正常场景的放大余量交互，改 (b) 猜错则白改；禁止猜修复）。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过（本轮零改动）。合同测试不适用（无 QML 视觉改动）。无截图：本轮零代码改动，且虚拟会话无法注入真实指针（快/慢移动差异不可复现）。
+- **残留风险**：定位为纯走读推演，(a)/(b) 均未实证。下轮入口：搭最小场景（真实 `DockAutoHideController` + `DockRevealHandle` + mask/Region 布线，mock `WindowService.records` 注入一条全屏记录），程序化驱动 handleEntered→Held→handleExited/pointerInside 翻转并复刻 DockContainer 的 80ms 宽限逻辑，断言 ~1s 内 phase 到 Hidden（控制器自带 `[DockAutoHide] X -> Y ... inhibit=` 日志可直接看哪个 inhibitor 残留）；若纯控制器仿真通过，则失败在真实输入管线（HoverHandler vs mask），需 libei/KWin script 级真实指针注入再查。
+
 ## 修复记录（每修完一项在此登记）
 
 > ⚠ 循环：第 1 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-1.diff
@@ -851,3 +857,5 @@
 > ⚠ 循环：第 108 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-108.diff
 
 > ⚠ 循环：第 109 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-109.diff
+
+> ⚠ 循环：第 110 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-110.diff
