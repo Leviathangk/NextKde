@@ -813,3 +813,11 @@
 > ⚠ 循环：第 101 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-101.diff
 
 > ⚠ 循环：第 102 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-102.diff
+
+### 103. [第 103 轮] [#214] 壁纸预览渲染毛边 —— 虚拟会话 shape trace 完成，收敛到形状可绘制性判定，未修（超时闸收尾，2026-10-19）
+- **定位（实证，承接第 101/102 轮）**：按第 102 轮建议在虚拟 KWin 会话跑了最小复现场景（`tmp/bugfix-shots/issue214-glass-trace.qml`：花纹底 + 大圆角 LiquidGlassPanel，radius 40 / cornerExponent 3，与 issue 截图配置一致）+ `KOS_GLASS_TRACE=1`（runner：`tmp/bugfix-shots/run-issue214-trace.py`，完整日志 `tmp/bugfix-shots/issue214-kwin.log`）。trace 实证三点：(1) **首个渲染帧走 region 路径**——`glass trace: shapes declared but none drawable, keeping the blur region geometry`，即声明 shape 已到达但被可绘制性判定拒绝，混合器只能按 QRegion 整数网格画材质（硬边、无 AA，正是第 101/102 轮截图归因的轮廓来源）；(2) 窗口稳定后各帧转为 `path shapes`（declared 1，radius 40 exponent 3），但形状 draw 的网格只有 **verts 6（单矩形 quad）+ rects 1**，圆角轮廓完全交给 `onscreen_rounded.glsl` 的 SDF fwidth AA，网格本身不描绘弧段；(3) `shaderRadius QVector4D(0,0,0,0)`——shaderBox/radius 是窗口级的（全屏窗口自然为 0），只约束窗口外轮廓，不约束面板轮廓，与第 102 轮走读一致。关键修正：第 102 轮推断"真实窗口走了 region 驱动路径"在稳定帧上不成立（稳定帧确实走声明 shape 路径）；**但第一帧/动画帧被 `declaredShapeMatchesRegion`（blur.cpp:1649-1657 容差）或可绘制性门槛拒绝而回落 region 几何是 trace 实证的**。毛边若是稳态现象，则嫌疑收敛到：稳态帧上真实壁纸预览窗口的 shape 同样被"none drawable"拒绝（即某条件让 shape draw 常态不可绘制，实际一直在画 region 硬边），或 quad+SDF AA 管线在用户 GPU/缩放下的实际输出仍有台阶。本轮场景稳定帧走 shapes，未能直接复现毛边（虚拟环境 llvmpipe，且未做逐像素对比截图）。
+- **修复**：无（零代码改动；"none drawable"的拒绝条件在 blur.cpp:1656 分支上游的变换/裁剪逻辑，需先确知真实会话稳态帧的 trace 归属再动，禁止猜修复）。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过（ninja no work to do，本轮零改动）。合同测试不适用（无 QML 改动）。trace 证据文件已存 `tmp/bugfix-shots/issue214-kwin.log`。无截图：虚拟会话截图通道未打通（kwin --virtual 不支持 wlr-screencopy/grim），毛边复现与逐像素归属仍需真实会话。
+- **残留风险**：虚拟会话（llvmpipe、无分数缩放）与用户环境有差异；下一步入口：(a) 在用户真实会话开 `kwinrc [Effect-glass] ShapeTrace`（或重启前设 `KOS_GLASS_TRACE=1`）看壁纸预览**稳态**帧打 "region" 还是 "shapes"——若 "region"，读同一 trace 行的 declared/effectShape 数值，定位 `declaredShapeMatchesRegion` 容差或可绘制性判定为何常态拒绝；(b) 若稳态为 "shapes" 仍见毛边，则嫌疑转向 quad+SDF AA 与整数模糊纹理边界的关系（`buildEffectiveShape` 产出的 region 网格作为模糊纹理边界仍硬裁剪 SDF 平滑带）。
+
+> ⚠ 循环：第 103 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-103.diff
