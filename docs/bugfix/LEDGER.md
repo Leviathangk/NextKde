@@ -55,6 +55,13 @@
 - **验证**：不适用（零代码改动，工作树与 iter 223 提交一致，无需重编）。探针已全部清理：module-null-sink 已卸载、无残留 sink-input、临时 wav 已删。
 - **残留风险**：(1) 本定位基于 pactl 17.0 + PipeWire 实测，若上游修复 JSON 写出器则缺陷自愈；(2) JSON 路径的 stderr 告警不影响 QJsonDocument 解析（JSON 本身仍合法），故症状仅是 "(null)" 字符串而非数据不可用——严重度低于 #224 的设备名场景；(3) 补录与否留待用户指定，下轮开工时若清单仍为空且用户未表态，继续按零改动轮登记，不重复展开。
 
+### 229. [第 229 轮] 待修清单为空、候选补录仍未获用户表态 —— 零改动轮（2026-10-19）
+- **开工核验**：待修清单 A/B/C 三项均已标已修；grep 复核三处修复均存活于工作树（`surfaceshape.cpp:177/206` scaleChanged×2、`DockWindow.qml:375-376` hoverProgress 门控×2、`PlatformServerAudio.cpp:135` 文本模式 info 调用属第 2/223 条处方保留项，:279 残留 `--format=json list sink-inputs` 即候选路径未动），工作树干净、与 iter 223 提交一致，回退循环未复发。开放 issue 复核（curl 直连 API）：开放集合与第 224–228 轮完全一致（#214/#200 bug 类已按台账标注处理，其余为 RFC/安装反馈/测试条目），无新增 bug 类 issue。
+- **候选状态**：第 224 轮登记的 `audio.applications`（PlatformServerAudio.cpp:279，sink-inputs 非 ASCII `(null)`）候选仍未获用户确认补录，按第 224 条约定"清单仍为空且用户未表态，继续按零改动轮登记，不重复展开"，本轮不处理、不重复实证。
+- **修复**：无代码改动。
+- **验证**：不适用（零代码改动，无需重编、无需合同测试）。
+- **残留风险**：候选缺陷（含现成处方，见第 224 条）持续存在；若用户确认补录，下轮按第 224 条处方（sink-inputs 改文本模式 `list sink-inputs` 按行解析，复用第 175-207 行单 tab 锚点方案，先核对 sink-inputs 文本输出顶层字段集）执行即可。
+
 ### 228. [第 228 轮] 待修清单为空、候选补录仍未获用户表态 —— 零改动轮（2026-10-19）
 - **开工核验**：待修清单 A/B/C 三项均已标已修；grep 复核三处修复均存活于工作树（`surfaceshape.cpp:177/206` scaleChanged×2、`DockWindow.qml:375-376` hoverProgress 门控×2、`PlatformServerAudio.cpp:135` 文本模式 info 调用属第 2/223 条处方保留项，:279 残留 `--format=json list sink-inputs` 即候选路径未动），工作树干净、与 iter 223 提交一致，回退循环未复发。开放 issue 复核（curl 直连 API）：开放集合与第 224–227 轮完全一致（#214/#200 bug 类已按台账标注处理，其余为 RFC/安装反馈/测试条目），无新增 bug 类 issue。
 - **候选状态**：第 224 轮登记的 `audio.applications`（PlatformServerAudio.cpp:279，sink-inputs 非 ASCII `(null)`）候选仍未获用户确认补录（第 227 轮已复核 issue #224 正文确认其范围为 Sound 面板 sink 设备名，候选不在其范围内），按第 224 条约定"清单仍为空且用户未表态，继续按零改动轮登记，不重复展开"，本轮不处理、不重复实证。
