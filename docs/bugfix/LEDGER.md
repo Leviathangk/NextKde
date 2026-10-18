@@ -12,6 +12,8 @@
 ### B. [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 已修，见修复记录第 222 条（第 222 轮）
 - **状态**：已修。第 222 轮按第 220 条处方原样重放 `DockWindow.qml` hoverHitRegion 门控（本轮开工核验第 220 轮修复确实未存活、第 221 轮回退循环已解除，A 项 iter 221 已入库存活）。本轮修复经 verify 后由循环脚本提交。
 
+> 候选（第 224 轮登记，**未补录**，待用户确认）：`audio.applications`（PlatformServerAudio.cpp:279，`--format=json list sink-inputs`）对非 ASCII 流名/媒体名返回字面 `(null)`（pactl 17.0 同族缺陷，本轮已实证复现，见修复记录第 224 条）。不在清单定义（用户指定 + GitHub issues）范围内，未列入待修；用户确认后可按第 224 条处方补录并修复。
+
 > 审计说明（第 217 轮）：修复记录第 1、2、109、110 条所载代码修复经逐项核验**均不存在于当前工作树，也不存在于任何 git 引用历史**（`git log --all -S` 对各修复特征串为零命中；`PlatformServerAudio.cpp:160` 仍为修复前 `--format=json list sinks`，DockIcon.qml 无 `_dockOwnsNameLabel`，DockWindow.qml 无 hoverProgress 门控，surfaceshape.cpp 无 scaleChanged 连接）。全 1–216 轮均有"改动已回退"警告（218 条），即历轮代码修复未存活、仅台账文档提交留存。因此第 111/114 轮移除说明的前提（修复已入代码）不成立，#214/#200 恢复为待修项；其余"已修"记录（1、2）涉及的 issue（#224 等）在开放 issue 集合中的状态以第 215/216 轮 GitHub 复核为准，不在本轮扩大处理范围。
 
 > 移除说明（第 111 轮）：#214 的 SurfaceShape 声明失步缺口已按第 108 条处方的"补连 scaleChanged 一行级修复"修入 `shell/native/surface-shape/surfaceshape.cpp`，移出待修清单，见修复记录第 109 条；若用户真实会话仍有毛边，按该条残留风险里第 106 条的 trace 方案继续排查。（**第 217 轮审计注：该修复未存活于代码树，已按上方审计说明恢复待修项 A**）
@@ -45,6 +47,13 @@
 - **残留风险**：定位为纯走读推演，(a)/(b) 均未实证。下轮入口：搭最小场景（真实 `DockAutoHideController` + `DockRevealHandle` + mask/Region 布线，mock `WindowService.records` 注入一条全屏记录），程序化驱动 handleEntered→Held→handleExited/pointerInside 翻转并复刻 DockContainer 的 80ms 宽限逻辑，断言 ~1s 内 phase 到 Hidden（控制器自带 `[DockAutoHide] X -> Y ... inhibit=` 日志可直接看哪个 inhibitor 残留）；若纯控制器仿真通过，则失败在真实输入管线（HoverHandler vs mask），需 libei/KWin script 级真实指针注入再查。
 
 ## 修复记录（每修完一项在此登记）
+
+### 224. [第 224 轮] 待修清单为空 —— 零改动；实证定位同族新缺陷：audio.applications（sink-inputs）非 ASCII 流名显示 (null)，待用户确认补录（2026-10-19）
+- **开工核验**：待修清单 A/B/C 三项均已标已修；grep 复核三处修复均存活于工作树（`surfaceshape.cpp` scaleChanged×2、`DockWindow.qml` hoverProgress 门控×2、`PlatformServerAudio.cpp:163` 文本模式 `list sinks`），回退循环未复发。开放 issue 复核（curl 直连 API，`gh` 不在 PATH）：bug 类 #214/#200/#205/#204/#203 均已登记处理，#211/#208/#207/#206/#202/#201/#199/#193/#183 为 RFC/功能请求，#46 安装反馈、#1 测试条目，无新增待修项。
+- **定位（本轮新增发现，非清单项）**：核验时发现 `audio.applications` 操作（`platform/src/daemon/PlatformServerAudio.cpp:279`）仍走 `--format=json list sink-inputs`，与第 223 轮已实证的 pactl 17.0 JSON 写出器非 ASCII 缺陷同根因。已实证复现：`pw-play -P 'stream.name="中文测试流",media.name="中文媒体名"'` 播放一条 sink-input 后，`pactl --format=json list sink-inputs` stderr 打 `Invalid non-ASCII character: 0xffffffe4` 且 JSON 输出 `"stream.name":"(null)"`、`"media.name":"(null)"`（字面 null 占位，与 #224 的 sink 现象一致）；文本模式 `pactl list sink-inputs` 同刻输出 `media.name = "中文媒体名"` 原样 UTF-8。后果：Control Center 每应用音量混音器对非 ASCII 应用流名/媒体名显示 "(null)"。第 223 条仅修了 sink（设备名）路径，sink-inputs 路径未覆盖。
+- **修复**：无代码改动。该缺陷不在待修清单（清单定义 = 用户指定 + GitHub issues；#224 登记范围为"设备名"，应用混音器路径不属已登记项），按铁律"只修待修清单里的一项、禁止猜修复"不擅自补录自发现缺陷。若用户确认补录为待修项，处方现成：与第 2/223 条相同，`PlatformServerAudio.cpp:279` 的 sink-inputs 调用改文本模式 `list sink-inputs` 按行解析（复用第 175-207 行的 `\tName:`/`\tDescription:` 单 tab 锚点方案，字段为 `Sink Input #` 头 + `\tName`（application.name 语义）等，需先核对 sink-inputs 文本输出的顶层字段集再动手）。
+- **验证**：不适用（零代码改动，工作树与 iter 223 提交一致，无需重编）。探针已全部清理：module-null-sink 已卸载、无残留 sink-input、临时 wav 已删。
+- **残留风险**：(1) 本定位基于 pactl 17.0 + PipeWire 实测，若上游修复 JSON 写出器则缺陷自愈；(2) JSON 路径的 stderr 告警不影响 QJsonDocument 解析（JSON 本身仍合法），故症状仅是 "(null)" 字符串而非数据不可用——严重度低于 #224 的设备名场景；(3) 补录与否留待用户指定，下轮开工时若清单仍为空且用户未表态，继续按零改动轮登记，不重复展开。
 
 ### 223. [第 223 轮] [#224] Control Center 声音面板非 ASCII 设备名显示 (null) —— 重放第 2 条处方：sink 列表改文本模式按行解析（已修，2026-10-19）
 - **开工核验**：`grep -n "format=json" platform/src/daemon/PlatformServerAudio.cpp` 第 160 行仍为 `--format=json list sinks`（第 2 条修复未存活，第 217 轮审计成立）；待修清单 A/B 已修（第 221/222 轮，iter 221/222 已提交、grep 复核两处修复均在树），本轮按台账定义与第 101 轮先例从开放 issue 补录 #224（C 项）并修复。
