@@ -366,8 +366,14 @@ PanelWindow {
         id: hoverHitRegion
         x: dockHoverRegion.x
         y: dockHoverRegion.y
-        width: dockContainer.pointerInside && hide.revealProgress > 0 ? dockHoverRegion.width : 0
-        height: dockContainer.pointerInside && hide.revealProgress > 0 ? dockHoverRegion.height : 0
+        // Gate the envelope on the real magnification state (hoverProgress),
+        // not just pointerInside: otherwise the envelope keeps feeding
+        // _dockPointerHover while the pointer parks in the invisible headroom,
+        // pinning pointerInside=true and the smart-hide "Held" phase forever
+        // (fullscreen case, issue #200). Magnification decays to 0 on exit,
+        // collapsing the envelope with it.
+        width: dockContainer.pointerInside && dockContainer.hoverProgress > 0 && hide.revealProgress > 0 ? dockHoverRegion.width : 0
+        height: dockContainer.pointerInside && dockContainer.hoverProgress > 0 && hide.revealProgress > 0 ? dockHoverRegion.height : 0
         visible: false
     }
 
