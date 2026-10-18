@@ -2,10 +2,20 @@
 
 ## 待修清单（用户指定 + GitHub issues）
 
-（空）
+### A. [#214] 壁纸预览渲染毛边（第 217 轮审计后恢复；根因已实证、处方已定）
+- **状态**：开放。第 111 轮移除说明所称"已修入 surfaceshape.cpp"的 scaleChanged 连接**不在当前代码树中**（见第 213 条审计）；本轮（217）已重放该两行修复，若循环再次回退，下轮先 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 核验，缺失则按第 109 条处方原样重放。
+- **根因**：见修复记录第 103/108 条（trace 实证：声明/region 失步→容差拒绝→无 AA region 路径）及第 109 条（`setTarget`/`rewireAncestors` 漏连 `scaleChanged`，`mapRectToScene` 折叠 scale）。
+- **处方**：修复记录第 109 条（两处各一行 connect）。
 
-> 移除说明（第 111 轮）：#214 的 SurfaceShape 声明失步缺口已按第 108 条处方的"补连 scaleChanged 一行级修复"修入 `shell/native/surface-shape/surfaceshape.cpp`，移出待修清单，见修复记录第 109 条；若用户真实会话仍有毛边，按该条残留风险里第 106 条的 trace 方案继续排查。
-> 移除说明（第 114 轮）：#200 的"卡住的 inhibitor"已定位为 hoverHitRegion 输入包络自反馈环并修复，移出待修清单，见修复记录第 110 条。
+### B. [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏（第 217 轮审计后恢复；根因已实证、处方已定）
+- **状态**：开放。第 114 轮移除说明所称"已修入 DockWindow.qml"的 `hoverProgress > 0` 门控**不在当前代码树中**（见第 213 条审计）；`DockWindow.qml:372-373` 仍为修复前条件。
+- **根因**：见修复记录第 110 条（hoverHitRegion 输入包络自反馈环）。
+- **处方**：修复记录第 110 条（`hoverHitRegion` 宽/高条件加 `hoverProgress > 0` 门控，一行级）。
+
+> 审计说明（第 217 轮）：修复记录第 1、2、109、110 条所载代码修复经逐项核验**均不存在于当前工作树，也不存在于任何 git 引用历史**（`git log --all -S` 对各修复特征串为零命中；`PlatformServerAudio.cpp:160` 仍为修复前 `--format=json list sinks`，DockIcon.qml 无 `_dockOwnsNameLabel`，DockWindow.qml 无 hoverProgress 门控，surfaceshape.cpp 无 scaleChanged 连接）。全 1–216 轮均有"改动已回退"警告（218 条），即历轮代码修复未存活、仅台账文档提交留存。因此第 111/114 轮移除说明的前提（修复已入代码）不成立，#214/#200 恢复为待修项；其余"已修"记录（1、2）涉及的 issue（#224 等）在开放 issue 集合中的状态以第 215/216 轮 GitHub 复核为准，不在本轮扩大处理范围。
+
+> 移除说明（第 111 轮）：#214 的 SurfaceShape 声明失步缺口已按第 108 条处方的"补连 scaleChanged 一行级修复"修入 `shell/native/surface-shape/surfaceshape.cpp`，移出待修清单，见修复记录第 109 条；若用户真实会话仍有毛边，按该条残留风险里第 106 条的 trace 方案继续排查。（**第 217 轮审计注：该修复未存活于代码树，已按上方审计说明恢复待修项 A**）
+> 移除说明（第 114 轮）：#200 的"卡住的 inhibitor"已定位为 hoverHitRegion 输入包络自反馈环并修复，移出待修清单，见修复记录第 110 条。（**第 217 轮审计注：该修复未存活于代码树，已按上方审计说明恢复待修项 B**）
 
 > 补录说明（第 101 轮）：清单此前为"（空）"数十轮，本轮按台账定义（用户指定 + GitHub issues）从开放 issue 补录以上 bug 类条目。#205 已于第 96 轮修复、#203 已于第 3 轮确认基线已含修复，不再列入；#211/#206/#207/#208/#193/#183/#202/#201/#199/#185 为 RFC/功能请求，非 bug，不列入。
 > 移除说明（第 107 轮）：#204 已确认基线（ba2c0eb 删除 StatusAreaEditor）已含修复，移出清单，见修复记录第 107 条。
@@ -1702,3 +1712,11 @@
 - **残留风险**：无。后续请先向台账待修清单补充新项（用户报告或 GitHub issues）再启动新一轮。
 
 > ⚠ 循环：第 216 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-216.diff
+
+### 213. [第 217 轮] 台账审计：历轮"已修"修复全部不在代码树中 + [#214] 重放 scaleChanged 连接（已改入工作树，2026-10-19）
+- **审计根因**：逐项核验发现修复记录第 1（DockIcon `_dockOwnsNameLabel`）、2（PlatformServerAudio 文本解析）、109（surfaceshape scaleChanged）、110（DockWindow hoverProgress 门控）条所载修复**均不在当前工作树，且 `git log --all -S` 对各特征串零命中**——从未进入任何提交。全 216 轮每轮都有"改动已回退"警告，即循环机制历来回退代码改动、仅台账文档提交存活，而台账"已修/移出待修"登记以工作树修复为前提，随之整体失效。因此第 111/114 轮的移除说明作废，#214/#200 恢复为待修项 A/B（详见待修清单节审计说明）。
+- **修复**：本轮处理待修项 A（#214，清单最前）。按第 109 条既定处方原样重放（非新猜测，根因已于第 103/108 条 trace 实证）：`shell/native/surface-shape/surfaceshape.cpp` 两处各一行——① `setTarget` 内 `heightChanged` 之后补 `connect(m_target, &QQuickItem::scaleChanged, this, &SurfaceShape::scheduleSync);`（附注释：mapRectToScene 折叠 scale）；② `rewireAncestors` 内祖先 `yChanged` 之后补 `m_ancestorConnections.append(connect(item, &QQuickItem::scaleChanged, this, &SurfaceShape::scheduleSync));`。无其他改动。#200（待修项 B）留给下轮，按第 110 条处方一行级门控。
+- **验证**：`cmake --preset debug` 配置通过 + `cmake --build --preset debug` 通过（exit=0，`kos_surface_shape` 重编并重链接 libkos_surface_shape.so）。合同测试不适用（纯 C++ 原生桥，无 QML 视觉变化）；无截图（修复生效在合成器 shape 协议层，quickshell software 后端不经 KWin 玻璃管线），人工/trace 验证步骤同第 109 条：真实会话 `KOS_GLASS_TRACE=1` 打开壁纸预览触发 jelly stretch，确认动画期间不再出现 "declared shape set does not match the blur region"、稳定帧保持 `path shapes`。
+- **残留风险**：(1) 本修复与第 109 条同源——若循环机制本轮再次回退代码，修复又将不在树中；下轮开工先 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 核验（缺失则按第 109 条处方重放，勿视为新 bug）。(2) 该修复只消除 scale-only 失步这一实证缺口，用户真实会话毛边是否全由它贡献未逐帧归属（第 106 条三分支 trace 方案仍有效）。(3) #200 尚未修，为待修清单现最前项。
+
+> ⚠ 循环：第 217 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-217.diff
