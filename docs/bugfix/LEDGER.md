@@ -753,3 +753,11 @@
 - **残留风险**：无。后续请先向台账待修清单补充新项（用户报告或 GitHub issues）再启动新一轮。
 
 > ⚠ 循环：第 95 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-95.diff
+
+### 96. [#205] DeskCenter 天气小组件文字显示重叠 —— 已修（2026-10-19）
+- **根因**：`shell/desktop/modules/deskcenter/DeskCenterWindow.qml` 天气卡片的顶部文字与底部内容无高度协调，在默认 medium 档（span [3,1]，高度=单格 ≈150px）必然重叠：① 大号当前温度固定 `topMargin: 29`、字号上限 42（行盒底 ≈29+53=82），压到锚定底部的周预报行（`weeklyForecast` top ≈ h−8−62 ≈ 80）——截图中 "24°" 压 "今天"；② 右上天气符号（top 14，字号至 34）与写死 `topMargin: 48` 的天气文字"晴"行盒相叠，而"晴"（48..69）又与底部锚定的"最高 X° 最低 Y°"行（`bottom: weeklyForecast.top; bottomMargin: 3`，约 64..77）重叠——截图中"晴"压"最低 20°"和"周四"。矮卡里顶锚元素组与底锚元素组在中带互相侵入。
+- **修复**：`shell/desktop/modules/deskcenter/DeskCenterWindow.qml:1194-1211`，仅 3 处、全部限于天气卡片内：① 温度字号增加"预报行上方可用高度"上限 `Math.min(42, parent.height * 0.32, Math.max(16, (parent.height - weeklyForecast.height - 38) / 1.5))`（行盒系数 1.5 由场景实测得出），高卡（h≳180）字号仍为 42 不变；② 天气符号字号同样加可用高度上限 `Math.min(34, parent.height * 0.26, Math.max(16, (parent.height - weeklyForecast.height - 72) * 0.75))`，并加 `id: weatherConditionSymbol`；③ "晴"文字 `topMargin` 由写死 48 改为 `weatherConditionSymbol.y + weatherConditionSymbol.height`（始终紧随符号行盒之下，不再与"最高/最低"行相撞）。高卡布局与原设计一致（"晴"仅随符号行盒下移数 px）。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过；`node shared/qml/test_visual_contract.mjs` 仅存在台账第 1 条登记的 main 既有失败（"built-in status tooltips use a black background"），无新失败。场景验证 `tmp/bugfix-shots/issue-205-weather-overlap.qml`（卡片结构/锚点/字号公式逐字复制自修复后源码，字面数据替代服务；经 `run-issue-205.py` 在 kwin_wayland --virtual + quickshell software 后端运行）：对 medium(150px) 与 large(310px) 两档高度断言 温度↔预报行、符号↔"晴"、"晴"↔"最高/最低"、"最高/最低"↔预报行 四组矩形零相交，输出 `ISSUE205_PASS`；截图 `tmp/bugfix-shots/issue-205-fixed-card-150.png`、`issue-205-fixed-card-310.png`、`issue-205-fixed-shot.png`（150px 档 24° 不压"今天"、"晴"不压"最低/周四"；310px 档布局正常）。
+- **残留风险**：矮卡（medium 档）下温度由 42px 缩到 ≈28px，是"不重叠"与"全尺寸"的取舍（可选替代：矮卡隐藏"最高/最低"行，未采用）；卡片高度 ≲120px 时任何排版都无法容纳全部元素，未处理；验证场景中的数据为字面量而非真实 WeatherService 输出（单例离线无预报数据），几何公式与源码逐字一致但未在完整 DeskCenter 窗口中端到端截图。待修清单其余 GitHub issue（#214 壁纸预览毛边、#204 状态栏设置显示不全等）仍未登记，需后续轮次逐项补录。
+
+> ⚠ 循环：第 96 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-96.diff
