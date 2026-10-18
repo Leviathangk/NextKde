@@ -15,6 +15,11 @@
       }
     },
     {
+      "name": "dev",
+      "displayName": "KOS Dev (alias of debug)",
+      "inherits": "debug"
+    },
+    {
       "name": "release",
       "displayName": "KOS Release",
       "generator": "Ninja",
@@ -126,6 +131,7 @@
   ],
   "buildPresets": [
     { "name": "debug", "configurePreset": "debug" },
+    { "name": "dev", "configurePreset": "dev" },
     { "name": "release", "configurePreset": "release" },
     { "name": "apps-dev", "configurePreset": "apps-dev" },
     { "name": "apps-release", "configurePreset": "apps-release" },

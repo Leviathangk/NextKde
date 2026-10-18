@@ -172,6 +172,9 @@ void SurfaceShape::setTarget(QQuickItem *target)
         connect(m_target, &QQuickItem::yChanged, this, &SurfaceShape::scheduleSync);
         connect(m_target, &QQuickItem::widthChanged, this, &SurfaceShape::scheduleSync);
         connect(m_target, &QQuickItem::heightChanged, this, &SurfaceShape::scheduleSync);
+        // sync() reads geometry via mapRectToScene, which folds in scale, so a
+        // scale-only change must re-run the sync like a geometry change does.
+        connect(m_target, &QQuickItem::scaleChanged, this, &SurfaceShape::scheduleSync);
         // The gate above reads effective visibility and opacity, so those have
         // to re-run the sync the same way a geometry change does.
         connect(m_target, &QQuickItem::visibleChanged, this, &SurfaceShape::scheduleSync);
@@ -199,6 +202,8 @@ void SurfaceShape::rewireAncestors()
         m_ancestorConnections.append(connect(item, &QQuickItem::xChanged,
                                              this, &SurfaceShape::scheduleSync));
         m_ancestorConnections.append(connect(item, &QQuickItem::yChanged,
+                                             this, &SurfaceShape::scheduleSync));
+        m_ancestorConnections.append(connect(item, &QQuickItem::scaleChanged,
                                              this, &SurfaceShape::scheduleSync));
         m_ancestorConnections.append(connect(item, &QQuickItem::visibleChanged,
                                              this, &SurfaceShape::scheduleSync));
