@@ -14,6 +14,12 @@
 - **验证**：不适用（零代码改动，未编译）。下轮建议入口：`kwin/glass-effect/src/blur.cpp` 模糊区域的收取与网格化、`shaders/onscreen_rounded.glsl` 的 box/uniform 与实际绘制几何的一致性；也可先在 quickshell 侧核对 `RoundedBlurRegion` 整数近似与 `SurfaceShape` 精确轮廓的偏差方向（模糊板应内缩而非外扩）。
 - **残留风险**：定位基于截图与代码走查，未在运行环境中复现逐像素归属；次要嫌疑：图库缩略图 `MultiEffect` mask（WallpaperPreviewBar.qml:147-151）的遮罩边缘锯齿，与面板毛边是两回事，下轮区分。
 
+### 102. [第 102 轮] [#214] 壁纸预览渲染毛边 —— 排除法收敛到 region 网格，未修（超时闸收尾，2026-10-19）
+- **定位（深化，承接第 101 轮）**：本轮对整条渲染管线的"轮廓生产者"做了排除法，全部四种绘制路径的边缘都是解析抗锯齿：(1) QML `LiquidGlassSurface` 是 Rectangle（自带 AA）；(2) `LiquidGlassPanel` 的 layer mask 走 `shell/desktop/shaders/squircle.frag:61-62`，`fwidth(dist)` 解析 AA；(3) 合成器声明 shape 路径的材质裁剪走 `kwin/glass-effect/src/shaders/onscreen_rounded.glsl:125`，同为 fwidth AA（SDF `roundedRectangleDist` 含 cornerExponent，glass.glsl:12-19，AppearanceTokens.shape.cornerExponent=3.0 已入 SDF，不是成因）；(4) 合成器 region 回退路径的着色器 AA 裁剪用的是**窗口级** box/radius（blur.cpp:2194-2195 的 shaderBox/nativeCornerRadius），只能平滑窗口外轮廓，平滑不了窗口内各面板的轮廓。唯一无 AA 的轮廓来源是 **QRegion 栅格化网格**：`RoundedBlurRegion.qml` 用矩形+四椭圆 Region 拼圆角，Qt 把椭圆栅格化成逐像素矩形台阶，`blur.cpp` 的 `buildEffectiveShape`（blur.cpp:1559-1577）按 region rect 生成 mesh 直接绘制。放大截图复核：`tmp/bugfix-shots/crop-gal-tr.png` 外轮廓台阶约 8-10px（放大 ≈8x，即原生 1px 硬台阶、无任何过渡带），而同图内部图库缩略图圆角平滑——第 101 轮残留的次要嫌疑（`MultiEffect` mask，WallpaperPreviewBar.qml:147-151）**排除**，毛边确认在面板外轮廓、归属 region 硬边。结合截图外轮廓完全无 AA：可见轮廓即 region 网格本身，说明该窗口的壁纸面板当时走的是 region 驱动路径（blur.cpp:1757 分支或声明 shape 未匹配回退，blur.cpp:1656），而非声明 shape 路径。
+- **修复**：无。最小修复需要先确知该窗口为何没走声明 shape 路径（是 `declaredShapeMatchesRegion` 容差拒绝、shape 协议未达，还是 `frameShape` 非空跳过了 blur.cpp:1612 分支），修错侧会白改；AA 化 region 路径则涉及 mesh/着色器管线改造。两者均超出本轮时间闸，禁止猜修复。
+- **验证**：不适用（零代码改动，未编译）。下轮建议入口：在虚拟 KWin 会话运行 shell 并打开壁纸预览，开启 shape trace（`blur.cpp:2239-2249`，`path` 字段直接打印 "region" 或 "shapes"），一步确证路径归属；若为 "shapes" 则排除法有漏洞需重查，若为 "region" 则按 trace 里 `declared`/`effectShape` 数值定位声明未生效的原因。
+- **残留风险**：排除法基于代码走读与截图放大，未逐像素复现；shape trace 需真实会话（quickshell software 后端不经过合成器玻璃管线，无法替代）。
+
 ## 修复记录（每修完一项在此登记）
 
 > ⚠ 循环：第 1 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-1.diff
@@ -805,3 +811,5 @@
 > ⚠ 循环：第 100 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-100.diff
 
 > ⚠ 循环：第 101 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-101.diff
+
+> ⚠ 循环：第 102 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-102.diff
