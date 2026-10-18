@@ -2,9 +2,10 @@
 
 ## 待修清单（用户指定 + GitHub issues）
 
-1. [#200] Dock 智能隐藏模式：全屏唤出后缓慢移出焦点不隐藏（bug，open）
+（空）
 
 > 移除说明（第 111 轮）：#214 的 SurfaceShape 声明失步缺口已按第 108 条处方的"补连 scaleChanged 一行级修复"修入 `shell/native/surface-shape/surfaceshape.cpp`，移出待修清单，见修复记录第 109 条；若用户真实会话仍有毛边，按该条残留风险里第 106 条的 trace 方案继续排查。
+> 移除说明（第 114 轮）：#200 的"卡住的 inhibitor"已定位为 hoverHitRegion 输入包络自反馈环并修复，移出待修清单，见修复记录第 110 条。
 
 > 补录说明（第 101 轮）：清单此前为"（空）"数十轮，本轮按台账定义（用户指定 + GitHub issues）从开放 issue 补录以上 bug 类条目。#205 已于第 96 轮修复、#203 已于第 3 轮确认基线已含修复，不再列入；#211/#206/#207/#208/#193/#183/#202/#201/#199/#185 为 RFC/功能请求，非 bug，不列入。
 > 移除说明（第 107 轮）：#204 已确认基线（ba2c0eb 删除 StatusAreaEditor）已含修复，移出清单，见修复记录第 107 条。
@@ -869,6 +870,14 @@
 
 > ⚠ 循环：第 111 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-111.diff
 
+### 110. [第 114 轮] [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 拆除 hoverHitRegion 输入包络自反馈环（已修，2026-10-19）
+- **根因**：第 110 轮候选 (a) 实证成立。`DockWindow.qml` 的 `hoverHitRegion`（原 366-372 行）在 `dockContainer.pointerInside && hide.revealProgress > 0` 时把窗口输入 mask 扩成 `dockHoverRegion`（dock 玻璃 + `hoverHeadroom` 竖向带 + 放大 `spread` 横向带）这一不可见悬停包络；而 `_dockPointerHover`（DockContainer.qml:465-466）挂在整个窗口 contentItem 上，hover 事件只要落在 mask 内就维持 `hovered` → `pointerInside` 永真 → 包络永续，构成自反馈环。全屏冲突下 dock 以 Held 相位常驻（唯一 inhibitor 即 pointerInside），指针缓慢移出玻璃后停在包络带内（或缓慢横穿宽 spread 带）即永不退出 ⇒ dock 不隐藏；快速移出一步跨出包络则正常隐藏，与 issue 的"全屏""缓慢"两个限定吻合。候选 (b)（corridor HoverHandler 事件可靠性）无任何代码证据，排除。
+- **修复**：`shell/desktop/modules/dock/DockWindow.qml:366-379` —— `hoverHitRegion` 的宽/高条件由 `pointerInside && revealProgress > 0` 改为 `pointerInside && hoverProgress > 0 && revealProgress > 0`（附注释）。依据：包络的真实用途是"放大时抬升图元保持可交互"（dockHoverRegion 注释原文），而实际放大状态由 `hoverProgress` 驱动（`_hoverTarget = pointerInside && _pointerOverApps`，`_pointerOverApps` 由指针映射进 contentRow 行内计算，DockContainer.qml:348）；指针离开应用行后 `hoverProgress` 自动衰减到 0。门控后包络精确跟随真实视觉抬升：指针在玻璃/应用行上时包络照常（放大交互、抬升图元点击零回归），指针停在被抬升区之外时包络随放大一起塌缩 → `hovered` 变 false → 80ms `hoverExitTimer` 宽限 → Held 退出 → HidePending → Hidden。玻璃本体 `dockHitRegion` 始终在 mask 内不受影响。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过（本改动为纯 QML，构建无错误）。合同测试仅剩台账第 1 条登记的 main 既有失败（"built-in status tooltips use a black background"），与本改动无关。无截图：修复生效在输入 mask/hover 管线，不改变任何可见渲染，且虚拟会话无法注入真实指针移动（第 110 轮已确认），截图无从对比。人工验证步骤：真实会话设智能隐藏模式，全屏一个窗口，边缘唤出 Dock 后 (1) 指针缓慢移出 dock 顶并停在玻璃上方数十 px 处 ⇒ dock 应在约 300ms（hoverProgress 衰减 + 80ms 宽限 + hideDelay）内开始隐藏；(2) 指针在 dock 图标上悬停触发放大后移到图标抬升顶部点按 ⇒ 放大窗口期内仍可交互（衰减窗口内）；(3) 无冲突桌面场景 dock 悬停放大行为与修复前一致。
+- **残留风险**：(1) 修复未在真实会话复现验证——若用户场景实为候选 (b)（mask 动态变化下 corridor HoverHandler exited 不可靠），本修复不解决，需 libei/KWin script 级真实指针注入再查；(2) 指针离开应用行后放大衰减窗口内移到图标抬升顶部，`hoverProgress` 归零后包络塌缩、dock 开始隐藏，极端快速操作下可能感觉"还没点就收走"——与智能隐藏契约一致，属预期取舍；(3) `hoverProgress` 为 0 而 `pointerInside` 为真的过渡帧（刚进入 dock 放大尚未爬升）包络为 0，与修复前等价（包络本就不覆盖玻璃本体）。
+
 > ⚠ 循环：第 112 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-112.diff
 
 > ⚠ 循环：第 113 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-113.diff
+
+> ⚠ 循环：第 114 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-114.diff
