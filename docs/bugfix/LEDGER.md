@@ -6,10 +6,8 @@
 - **状态**：已修。第 221 轮查明历轮"修复未存活"的真正根因（循环脚本 verify 用不存在的 `dev` 预设 → 每轮 `git reset --hard` 清树），在 `CMakePresets.json` 补 `dev` 别名预设解除回退循环，并按第 109 条处方重放 `surfaceshape.cpp` 两处一行 connect。本轮修复已可存活（verify 通过后由循环脚本提交）。
 - **根因**：见修复记录第 221 条（含代码根因与存活根因两层）。
 
-### B. [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 修复再次未存活，待重放（第 221 轮核验）
-- **状态**：开放。第 221 轮开工复核 `grep -c "hoverProgress > 0" shell/desktop/modules/dock/DockWindow.qml` = 0——第 220 轮修复同因（verify `dev` 预设失败 → reset --hard）被回退，第 221 次回退警告成立。**第 221 轮已解除回退循环（CMakePresets.json 补 dev 预设）**，下轮按第 220 条处方原样重放 `DockWindow.qml` hoverHitRegion 门控即可存活。
-- **根因**：见修复记录第 108/110/220 条（hoverHitRegion 输入包络自反馈环）。
-- **处方**：修复记录第 220 条（`hoverHitRegion` 宽/高条件加 `dockContainer.hoverProgress > 0` 门控）。
+### B. [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 已修，见修复记录第 222 条（第 222 轮）
+- **状态**：已修。第 222 轮按第 220 条处方原样重放 `DockWindow.qml` hoverHitRegion 门控（本轮开工核验第 220 轮修复确实未存活、第 221 轮回退循环已解除，A 项 iter 221 已入库存活）。本轮修复经 verify 后由循环脚本提交。
 
 > 审计说明（第 217 轮）：修复记录第 1、2、109、110 条所载代码修复经逐项核验**均不存在于当前工作树，也不存在于任何 git 引用历史**（`git log --all -S` 对各修复特征串为零命中；`PlatformServerAudio.cpp:160` 仍为修复前 `--format=json list sinks`，DockIcon.qml 无 `_dockOwnsNameLabel`，DockWindow.qml 无 hoverProgress 门控，surfaceshape.cpp 无 scaleChanged 连接）。全 1–216 轮均有"改动已回退"警告（218 条），即历轮代码修复未存活、仅台账文档提交留存。因此第 111/114 轮移除说明的前提（修复已入代码）不成立，#214/#200 恢复为待修项；其余"已修"记录（1、2）涉及的 issue（#224 等）在开放 issue 集合中的状态以第 215/216 轮 GitHub 复核为准，不在本轮扩大处理范围。
 
@@ -44,6 +42,13 @@
 - **残留风险**：定位为纯走读推演，(a)/(b) 均未实证。下轮入口：搭最小场景（真实 `DockAutoHideController` + `DockRevealHandle` + mask/Region 布线，mock `WindowService.records` 注入一条全屏记录），程序化驱动 handleEntered→Held→handleExited/pointerInside 翻转并复刻 DockContainer 的 80ms 宽限逻辑，断言 ~1s 内 phase 到 Hidden（控制器自带 `[DockAutoHide] X -> Y ... inhibit=` 日志可直接看哪个 inhibitor 残留）；若纯控制器仿真通过，则失败在真实输入管线（HoverHandler vs mask），需 libei/KWin script 级真实指针注入再查。
 
 ## 修复记录（每修完一项在此登记）
+
+### 222. [第 222 轮] [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 重放 hoverHitRegion hoverProgress 门控（已修，2026-10-19）
+- **开工核验**：`grep -c "hoverProgress > 0" shell/desktop/modules/dock/DockWindow.qml` = 0，确认第 220 轮修复因旧回退循环未存活；另核验第 221 轮两处修复均已存活（`surfaceshape.cpp:177/206` scaleChanged 连接在树、iter 221 已提交），回退循环确认解除。
+- **根因**：同修复记录第 108/110/220 条（hoverHitRegion 输入包络自反馈环）。`DockWindow.qml` 的 `hoverHitRegion` 宽/高条件原为 `pointerInside && revealProgress > 0`，把输入 mask 扩到 dock 玻璃上方 `hoverHeadroom` 带；`_dockPointerHover` 挂整窗 contentItem，指针停在这条不可见包络内持续刷新 hovered ⇒ `pointerInside` 永真 ⇒ 包络永存。全屏冲突场景 dock 落 "Held" 相位后缓慢移出即停于包络内 ⇒ Held 永不退出 ⇒ 不隐藏；快移一步跨出包络则正常隐藏，与 issue "全屏 + 缓慢"限定吻合。
+- **修复**：`shell/desktop/modules/dock/DockWindow.qml:365-378` —— `hoverHitRegion` 宽/高条件由 `dockContainer.pointerInside && hide.revealProgress > 0` 改为 `dockContainer.pointerInside && dockContainer.hoverProgress > 0 && hide.revealProgress > 0`（附 6 行注释说明自反馈环与门控依据）。依据与第 220 条相同：包络真实用途是"放大时抬升图元保持可交互"，实际放大状态由 `hoverProgress` 驱动（`_hoverTarget = pointerInside && _pointerOverApps && !isEditing && magnificationEnabled`，DockContainer.qml:251/267，FrameAnimation 平滑推进、指针离开应用行后自动衰减到 0）；门控后包络精确跟随真实视觉抬升，指针在应用行上时包络照常，停在玻璃上方/侧缘空白时包络随放大塌缩 ⇒ hovered 变 false ⇒ 80ms `hoverExitTimer` 宽限 ⇒ Held 退出 ⇒ HidePending ⇒ Hidden。玻璃本体 `dockHitRegion` 始终在 mask 内不受影响。
+- **验证**：`cmake --preset dev` 配置通过、`cmake --build --preset dev` 通过（纯 QML 改动，增量构建 `ninja: no work to do`，exit=0）。合同测试 `node shared/qml/test_visual_contract.mjs` 唯一失败仍为台账第 1 条已登记的 main 既有失败（"built-in status tooltips use a black background"），无新增失败。无截图：修复生效在输入 mask/hover 管线，不改变任何可见渲染，且虚拟会话无法注入真实指针移动（第 110 轮已确认快/慢移动差异不可复现）。人工验证步骤：真实会话设智能隐藏模式，全屏一个窗口，边缘唤出 Dock 后 (1) 指针缓慢移出 dock 顶并停在玻璃上方数十 px 处 ⇒ dock 应在约 300ms（hoverProgress 衰减 + 80ms 宽限 + hideDelay）内开始隐藏；(2) 指针悬停图标触发放大后移到抬升图元顶部点按 ⇒ 放大衰减窗口内仍可交互；(3) 无冲突桌面场景悬停放大行为与修复前一致。
+- **残留风险**：(1) 未在真实会话复现验证——若用户场景实为第 108 条候选 (b)（mask 动态变化下 corridor HoverHandler exited 不可靠），本修复不解决，需 libei/KWin script 级真实指针注入再查；(2) 放大衰减窗口内包络先于视觉塌缩，极端快速操作下可能感觉"还没点就收走"——与智能隐藏契约一致，属预期取舍；(3) 刚进入 dock、hoverProgress 尚未爬升的过渡帧包络为 0，与修复前等价。本轮改动由循环脚本在 verify 通过后提交（iter 222）。
 
 ### 221. [第 221 轮] [#214] 壁纸预览渲染毛边 —— 重放 scaleChanged 补连；并查明历轮"修复未存活"根因（dev 预设缺失→reset --hard 清树），补 dev 别名预设解除回退循环（已修，2026-10-19）
 - **存活根因（历轮 220 次"改动已回退"的真正原因，非代码 bug）**：循环脚本 `~/apps/agent-loop-bugfix.sh` 的 `verify_round`（第 42 行）跑 `cmake --build --preset dev`，而本仓库只有 debug/release/apps-dev/… 预设、**无 `dev` 构建预设**，每轮 verify 必失败（loop.log 反复出现 "No such build preset: \"dev\""）→ 脚本第 99 行 `git reset --hard` 把本轮**全部代码改动**抹掉；而 `.bugfix/` 在 `.git/info/exclude` 中被 git 忽略，reset 不触及 → 只有台账文字存活、代码修复每轮清零。第 217 轮审计"修复不存在于任何 git 引用历史"由此完全解释：历轮代码从未通过 verify、从未被提交。脚本正在运行（PID 168331）不能原地编辑（bash 按字节偏移续读运行中脚本，编辑会错乱执行），故最小修法落在仓库侧。
