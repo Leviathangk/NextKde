@@ -2,15 +2,15 @@
 
 ## 待修清单（用户指定 + GitHub issues）
 
-### A. [#214] 壁纸预览渲染毛边 —— 已修复，见修复记录第 219 条（第 219 轮重放第 218 条处方）
-- **状态**：已修。第 219 轮开工时 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 零命中——第 218 轮修复**再次未存活**（历轮回退警告第 219 次成立）；本轮按第 109/218 条处方原样重放两处各一行连接，编译通过。
-- **根因**：见修复记录第 103/108 条（trace 实证：声明/region 失步→容差拒绝→无 AA region 路径）及第 109 条（`setTarget`/`rewireAncestors` 漏连 `scaleChanged`，`mapRectToScene` 折叠 scale）。
-- **处方**：修复记录第 109 条（两处各一行 connect）。
+### A. [#214] 壁纸预览渲染毛边 —— 修复再次未存活，待重放（第 220 轮核验）
+- **状态**：开放。第 220 轮开工后复核 `grep -c scaleChanged shell/native/surface-shape/surfaceshape.cpp` = **0**——第 219 轮修复在本轮构建期间（该文件被重编）仍被回退，第 220 次回退警告成立。本轮按铁律只修一项（#200），未重放本项。
+- **根因**：见修复记录第 103/108 条及第 109 条（`setTarget`/`rewireAncestors` 漏连 `scaleChanged`，`mapRectToScene` 折叠 scale）。
+- **处方**：修复记录第 109 条（两处各一行 connect）。下轮开工先 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 核验；若再次为零，应按第 219 条残留风险提示排查循环脚本对工作区的还原策略，而非无限重放。
 
-### B. [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏（第 217 轮审计后恢复；根因已实证、处方已定）
-- **状态**：开放。第 114 轮移除说明所称"已修入 DockWindow.qml"的 `hoverProgress > 0` 门控**不在当前代码树中**（见第 213 条审计）；`DockWindow.qml:372-373` 仍为修复前条件。
-- **根因**：见修复记录第 110 条（hoverHitRegion 输入包络自反馈环）。
-- **处方**：修复记录第 110 条（`hoverHitRegion` 宽/高条件加 `hoverProgress > 0` 门控，一行级）。
+### B. [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 已修，见修复记录第 220 条（第 220 轮）
+- **状态**：已修。第 220 轮按第 110 条处方将 `hoverHitRegion` 宽/高条件加 `dockContainer.hoverProgress > 0` 门控（`DockWindow.qml:369-376`，含注释共 8 行），编译通过、合同测试无新增失败。
+- **根因**：见修复记录第 108/110 条（hoverHitRegion 输入包络自反馈环）。
+- **处方**：已落实，见修复记录第 220 条。
 
 > 审计说明（第 217 轮）：修复记录第 1、2、109、110 条所载代码修复经逐项核验**均不存在于当前工作树，也不存在于任何 git 引用历史**（`git log --all -S` 对各修复特征串为零命中；`PlatformServerAudio.cpp:160` 仍为修复前 `--format=json list sinks`，DockIcon.qml 无 `_dockOwnsNameLabel`，DockWindow.qml 无 hoverProgress 门控，surfaceshape.cpp 无 scaleChanged 连接）。全 1–216 轮均有"改动已回退"警告（218 条），即历轮代码修复未存活、仅台账文档提交留存。因此第 111/114 轮移除说明的前提（修复已入代码）不成立，#214/#200 恢复为待修项；其余"已修"记录（1、2）涉及的 issue（#224 等）在开放 issue 集合中的状态以第 215/216 轮 GitHub 复核为准，不在本轮扩大处理范围。
 
@@ -45,6 +45,12 @@
 - **残留风险**：定位为纯走读推演，(a)/(b) 均未实证。下轮入口：搭最小场景（真实 `DockAutoHideController` + `DockRevealHandle` + mask/Region 布线，mock `WindowService.records` 注入一条全屏记录），程序化驱动 handleEntered→Held→handleExited/pointerInside 翻转并复刻 DockContainer 的 80ms 宽限逻辑，断言 ~1s 内 phase 到 Hidden（控制器自带 `[DockAutoHide] X -> Y ... inhibit=` 日志可直接看哪个 inhibitor 残留）；若纯控制器仿真通过，则失败在真实输入管线（HoverHandler vs mask），需 libei/KWin script 级真实指针注入再查。
 
 ## 修复记录（每修完一项在此登记）
+
+### 220. [第 220 轮] [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— hoverHitRegion 加 hoverProgress 门控，断开输入包络自反馈环（已修，2026-10-19）
+- **根因**：`DockWindow.qml` 的 `hoverHitRegion`（输入 mask 的一部分，旧 369-370 行）宽/高条件为 `pointerInside && revealProgress > 0`——只要 `pointerInside` 为真且 dock 处于显现态，就把输入 mask 扩到 dock 玻璃上方的 `hoverHeadroom` 带 + `effectiveHoverScale` 水平扩展带（`dockHoverRegion`，DockWindow.qml:348-364）。而 `pointerInside` 来自挂在整窗 contentItem 上的 `_dockPointerHover`（DockContainer.qml），指针停在这条**不可见包络内**任意一点都持续刷新 hovered ⇒ `pointerInside` 永真 ⇒ 包络永存——自反馈环。全屏冲突场景 dock 唯一经 inhibitor 唤出并落 "Held" 相位（DockAutoHideController.qml），缓慢移出即停在该包络内 ⇒ Held 永不退出 ⇒ 不隐藏；快移一步跨出包络则正常隐藏，与 issue 的"全屏 + 缓慢"限定吻合（候选 (a)，第 108 条定位）。
+- **修复**：`shell/desktop/modules/dock/DockWindow.qml:369-376` —— `hoverHitRegion` 宽/高条件由 `pointerInside && revealProgress > 0` 改为 `pointerInside && dockContainer.hoverProgress > 0 && revealProgress > 0`（附 3 行注释）。依据：包络的真实用途是"放大时抬升图元保持可交互"（`dockHoverRegion` 注释原文），实际放大状态由 `hoverProgress` 驱动——`_hoverTarget = pointerInside && _pointerOverApps && !isEditing && magnificationEnabled`（DockContainer.qml:267-268），`_pointerOverApps` 由指针映射进 contentRow 行内计算，`hoverProgress` 由 FrameAnimation 朝 `_hoverTarget` 平滑推进、指针离开应用行后自动衰减到 0（DockContainer.qml:329-362）。门控后包络精确跟随真实视觉抬升：指针在应用行上时包络照常（放大交互零回归）；指针停在被抬升区之外（玻璃上方/侧缘空白）时包络随放大一起塌缩 ⇒ `hovered` 变 false ⇒ 80ms `hoverExitTimer` 宽限 ⇒ Held 退出 ⇒ HidePending ⇒ Hidden。玻璃本体 `dockHitRegion` 始终在 mask 内不受影响。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过（增量构建后 `ninja: no work to do`，exit=0；本轮纯 QML 改动）。合同测试 `node shared/qml/test_visual_contract.mjs` 唯一失败为台账第 1 条已登记的 main 既有失败（"built-in status tooltips use a black background"），与本改动无关、无新增失败。无截图：修复生效在输入 mask/hover 管线，不改变任何可见渲染，且虚拟会话无法注入真实指针移动（第 110 轮已确认快/慢移动差异不可复现）。人工验证步骤：真实会话设智能隐藏模式，全屏一个窗口，边缘唤出 Dock 后 (1) 指针缓慢移出 dock 顶并停在玻璃上方数十 px 处 ⇒ dock 应在约 300ms（hoverProgress 衰减 + 80ms 宽限 + hideDelay）内开始隐藏；(2) 指针悬停图标触发放大后移到抬升图元顶部点按 ⇒ 放大衰减窗口内仍可交互；(3) 无冲突桌面场景悬停放大行为与修复前一致。
+- **残留风险**：(1) 未在真实会话复现验证——若用户场景实为第 108 条候选 (b)（mask 动态变化下 corridor HoverHandler exited 不可靠），本修复不解决，需 libei/KWin script 级真实指针注入再查；(2) 放大衰减窗口内包络先于视觉塌缩，极端快速操作下可能感觉"还没点就收走"——与智能隐藏契约一致，属预期取舍；(3) 刚进入 dock、hoverProgress 尚未爬升的过渡帧包络为 0，与修复前等价（包络本就不覆盖玻璃本体）。另：本轮构建期间复核发现第 219 轮的 surfaceshape.cpp scaleChanged 修复再次被回退（grep 0 命中，第 220 次回退警告），#214 按待修清单 A 项标注保持开放；历轮"修复未存活"模式已在 219/220 条反复提示应排查循环脚本的工作区还原策略。
 
 ### 219. [第 219 轮] [#214] 壁纸预览渲染毛边 —— 重放第 218 条处方：补连 scaleChanged（已修，2026-10-19）
 - **根因**：与修复记录第 218 条相同（开工核验 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 零命中，确认第 218 轮修复未存活于代码树）：`shell/native/surface-shape/surfaceshape.cpp` 的 `setTarget`（本轮 171-178 行）与 `rewireAncestors`（本轮 199-206 行）只连了 x/y/width/height/visible/opacity（祖先链为 x/y/visible/opacity），漏 `QQuickItem::scaleChanged`；而 sync() 读取几何用 `mapRectToScene`（surfaceshape.cpp:418，折叠 item 及祖先 scale）。纯 scale 变化（WallpaperPreviewBar 的 jelly stretch `scale: 1 + jellyStretch * 0.20`、开合动画 `scale: 0.94 + 0.06 * opacity`）因此不触发重新发布，声明几何过期 → 与 blur region 失配 → `declaredShapeMatchesRegion` 容差拒绝 → 玻璃落无 AA 的 region 驱动路径 → 弧段硬台阶（第 102/103/108 条 trace 实证的因果链）。
@@ -1736,3 +1742,5 @@
 > ⚠ 循环：第 218 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-218.diff
 
 > ⚠ 循环：第 219 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-219.diff
+
+> ⚠ 循环：第 220 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-220.diff
