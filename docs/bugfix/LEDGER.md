@@ -821,3 +821,5 @@
 - **残留风险**：虚拟会话（llvmpipe、无分数缩放）与用户环境有差异；下一步入口：(a) 在用户真实会话开 `kwinrc [Effect-glass] ShapeTrace`（或重启前设 `KOS_GLASS_TRACE=1`）看壁纸预览**稳态**帧打 "region" 还是 "shapes"——若 "region"，读同一 trace 行的 declared/effectShape 数值，定位 `declaredShapeMatchesRegion` 容差或可绘制性判定为何常态拒绝；(b) 若稳态为 "shapes" 仍见毛边，则嫌疑转向 quad+SDF AA 与整数模糊纹理边界的关系（`buildEffectiveShape` 产出的 region 网格作为模糊纹理边界仍硬裁剪 SDF 平滑带）。
 
 > ⚠ 循环：第 103 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-103.diff
+
+> ⚠ 循环：第 104 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-104.diff
