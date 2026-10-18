@@ -144,32 +144,66 @@ void PlatformServer::runAudioOutputs(QLocalSocket *socket, const QJsonObject &re
     connect(process, &QProcess::finished, this,
             [this, process, first = true, defaultName = QString()]
             (int code, QProcess::ExitStatus status) mutable {
-        QJsonParseError error;
-        const auto document = QJsonDocument::fromJson(process->readAllStandardOutput(), &error);
-        if (code != 0 || status != QProcess::NormalExit || error.error != QJsonParseError::NoError
-            || (first ? !document.isObject() : !document.isArray())) {
+        if (first) {
+            QJsonParseError error;
+            const auto document = QJsonDocument::fromJson(process->readAllStandardOutput(), &error);
+            if (code != 0 || status != QProcess::NormalExit || error.error != QJsonParseError::NoError
+                || !document.isObject()) {
+                completeInFlight(QStringLiteral("audio.outputs"), false, {},
+                                 QStringLiteral("audio-unavailable"),
+                                 QStringLiteral("无法读取音频设备，请重试"), true, kAudioCacheTtlMs);
+                process->deleteLater();
+                return;
+            }
+            defaultName = document.object().value(QStringLiteral("default_sink_name")).toString();
+            first = false;
+            // pactl 17.0 的 JSON 写出器拒绝非 ASCII 字节（description 输出为字面
+            // (null)），sink 列表改用文本模式按行解析；顶层字段为单 tab 缩进，
+            // 属性块缩进更深不会误配。
+            process->setArguments({QStringLiteral("list"), QStringLiteral("sinks")});
+            process->start();
+            return;
+        }
+        if (code != 0 || status != QProcess::NormalExit) {
             completeInFlight(QStringLiteral("audio.outputs"), false, {},
                              QStringLiteral("audio-unavailable"),
                              QStringLiteral("无法读取音频设备，请重试"), true, kAudioCacheTtlMs);
             process->deleteLater();
             return;
         }
-        if (first) {
-            defaultName = document.object().value(QStringLiteral("default_sink_name")).toString();
-            first = false;
-            process->setArguments({QStringLiteral("--format=json"), QStringLiteral("list"), QStringLiteral("sinks")});
-            process->start();
-            return;
-        }
         QJsonArray outputs;
-        for (const auto &value : document.array()) {
-            const auto sink = value.toObject();
-            const QString name = sink.value(QStringLiteral("name")).toString();
-            if (name.isEmpty()) continue;
-            const QString description = sink.value(QStringLiteral("description")).toString();
+        QString name;
+        QString description;
+        auto flushSink = [&]() {
+            if (name.isEmpty()) return;
             outputs.append(QJsonObject{{QStringLiteral("name"), name},
                 {QStringLiteral("description"), description.isEmpty() ? name : description},
                 {QStringLiteral("isDefault"), name == defaultName}});
+            name.clear();
+            description.clear();
+        };
+        const QList<QByteArray> lines = process->readAllStandardOutput().split('\n');
+        for (const QByteArray &line : lines) {
+            if (line.startsWith("Sink #")) {
+                flushSink();
+                continue;
+            }
+            if (!line.startsWith('\t')) continue;
+            const QByteArray body = line.mid(1);
+            if (body.startsWith('\t')) continue; // 属性块，缩进更深
+            if (body.startsWith("Name: ")) {
+                name = QString::fromUtf8(body.mid(6));
+            } else if (body.startsWith("Description: ")) {
+                description = QString::fromUtf8(body.mid(13));
+            }
+        }
+        flushSink();
+        if (outputs.isEmpty()) {
+            completeInFlight(QStringLiteral("audio.outputs"), false, {},
+                             QStringLiteral("audio-unavailable"),
+                             QStringLiteral("无法读取音频设备，请重试"), true, kAudioCacheTtlMs);
+            process->deleteLater();
+            return;
         }
         completeInFlight(QStringLiteral("audio.outputs"), true,
                 {{QStringLiteral("outputs"), outputs}, {QStringLiteral("available"), true}},
