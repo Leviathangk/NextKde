@@ -55,6 +55,13 @@
 - **验证**：不适用（零代码改动，工作树与 iter 223 提交一致，无需重编）。探针已全部清理：module-null-sink 已卸载、无残留 sink-input、临时 wav 已删。
 - **残留风险**：(1) 本定位基于 pactl 17.0 + PipeWire 实测，若上游修复 JSON 写出器则缺陷自愈；(2) JSON 路径的 stderr 告警不影响 QJsonDocument 解析（JSON 本身仍合法），故症状仅是 "(null)" 字符串而非数据不可用——严重度低于 #224 的设备名场景；(3) 补录与否留待用户指定，下轮开工时若清单仍为空且用户未表态，继续按零改动轮登记，不重复展开。
 
+### 225. [第 225 轮] 待修清单为空、候选补录未获用户表态 —— 零改动轮（2026-10-19）
+- **开工核验**：待修清单 A/B/C 三项均已标已修；grep 复核三处修复均存活于工作树（`surfaceshape.cpp:177/206` scaleChanged×2、`DockWindow.qml` hoverProgress 门控×2、`PlatformServerAudio.cpp:135` 文本模式 `list sinks`，残留的 `--format=json` 仅剩 info 调用属第 2/223 条处方保留项），工作树与 iter 223 提交一致，回退循环未复发。
+- **候选状态**：第 224 轮登记的 `audio.applications`（PlatformServerAudio.cpp:279，sink-inputs 非 ASCII `(null)`）候选仍未获用户确认补录，按第 224 条约定"清单仍为空且用户未表态，继续按零改动轮登记，不重复展开"，本轮不处理、不重复实证。
+- **修复**：无代码改动。
+- **验证**：不适用（零代码改动，无需重编、无需合同测试）。
+- **残留风险**：候选缺陷（含现成处方，见第 224 条）持续存在；若用户确认补录，下轮按第 224 条处方（sink-inputs 改文本模式按行解析，复用第 175-207 行单 tab 锚点方案，先核对文本输出顶层字段集）执行即可。
+
 ### 223. [第 223 轮] [#224] Control Center 声音面板非 ASCII 设备名显示 (null) —— 重放第 2 条处方：sink 列表改文本模式按行解析（已修，2026-10-19）
 - **开工核验**：`grep -n "format=json" platform/src/daemon/PlatformServerAudio.cpp` 第 160 行仍为 `--format=json list sinks`（第 2 条修复未存活，第 217 轮审计成立）；待修清单 A/B 已修（第 221/222 轮，iter 221/222 已提交、grep 复核两处修复均在树），本轮按台账定义与第 101 轮先例从开放 issue 补录 #224（C 项）并修复。
 - **根因**：同修复记录第 2 条——上游 pactl 17.0 的 JSON 写出器拒绝非 ASCII 字节，`pactl --format=json list sinks` 对含中文 description 的 sink 实测输出 `"description":"(null)"`（本轮复现：module-null-sink `device.description=中文测试音箱`），字面 `(null)` 原样进入 JSON → QML；文本模式 `pactl list sinks` 任意 locale 下均原样输出 UTF-8。
