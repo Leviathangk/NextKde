@@ -868,3 +868,5 @@
 - **残留风险**：本修复消除的是"scale-only 变化导致声明过期失步"这一实证缺口；用户真实会话的毛边是否全部由它贡献未逐帧归属（第 106 条的另一嫌疑——真实会话 `declaredSurfaceShapes` 为空/桥未送达——仍在）。若修后仍见毛边，按第 106 条残留风险的 (a)/(b)/(c) 三分支 trace 方案继续：`path region declared 0` 查桥送达，`path region declared N>0` 按数值重查失配，`path shapes` 仍毛边则转 GPU/驱动侧 fwidth 实效排查。`rotationChanged` 同样未连接（mapRectToScene 亦折叠 rotation），本仓库玻璃面板未发现 rotation 使用，未顺手加。
 
 > ⚠ 循环：第 111 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-111.diff
+
+> ⚠ 循环：第 112 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-112.diff
