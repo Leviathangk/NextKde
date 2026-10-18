@@ -2,6 +2,9 @@
 
 ## 待修清单（用户指定 + GitHub issues）
 
+### C. [#224] Control Center 声音面板非 ASCII 设备名显示 (null) —— 已修，见修复记录第 223 条（第 223 轮）
+- **状态**：已修。第 223 轮补录（清单 A/B 已修后按第 101 轮先例从开放 issue 补录）并重放第 2 条处方；第 217 轮审计确认第 2 条修复因旧回退循环未存活（本轮开工核验 `PlatformServerAudio.cpp:160` 仍为 `--format=json list sinks`），第 221 轮回退循环已解除，本轮修复经 verify 后由循环脚本提交。
+
 ### A. [#214] 壁纸预览渲染毛边 —— 已修，见修复记录第 221 条（第 221 轮）
 - **状态**：已修。第 221 轮查明历轮"修复未存活"的真正根因（循环脚本 verify 用不存在的 `dev` 预设 → 每轮 `git reset --hard` 清树），在 `CMakePresets.json` 补 `dev` 别名预设解除回退循环，并按第 109 条处方重放 `surfaceshape.cpp` 两处一行 connect。本轮修复已可存活（verify 通过后由循环脚本提交）。
 - **根因**：见修复记录第 221 条（含代码根因与存活根因两层）。
@@ -42,6 +45,13 @@
 - **残留风险**：定位为纯走读推演，(a)/(b) 均未实证。下轮入口：搭最小场景（真实 `DockAutoHideController` + `DockRevealHandle` + mask/Region 布线，mock `WindowService.records` 注入一条全屏记录），程序化驱动 handleEntered→Held→handleExited/pointerInside 翻转并复刻 DockContainer 的 80ms 宽限逻辑，断言 ~1s 内 phase 到 Hidden（控制器自带 `[DockAutoHide] X -> Y ... inhibit=` 日志可直接看哪个 inhibitor 残留）；若纯控制器仿真通过，则失败在真实输入管线（HoverHandler vs mask），需 libei/KWin script 级真实指针注入再查。
 
 ## 修复记录（每修完一项在此登记）
+
+### 223. [第 223 轮] [#224] Control Center 声音面板非 ASCII 设备名显示 (null) —— 重放第 2 条处方：sink 列表改文本模式按行解析（已修，2026-10-19）
+- **开工核验**：`grep -n "format=json" platform/src/daemon/PlatformServerAudio.cpp` 第 160 行仍为 `--format=json list sinks`（第 2 条修复未存活，第 217 轮审计成立）；待修清单 A/B 已修（第 221/222 轮，iter 221/222 已提交、grep 复核两处修复均在树），本轮按台账定义与第 101 轮先例从开放 issue 补录 #224（C 项）并修复。
+- **根因**：同修复记录第 2 条——上游 pactl 17.0 的 JSON 写出器拒绝非 ASCII 字节，`pactl --format=json list sinks` 对含中文 description 的 sink 实测输出 `"description":"(null)"`（本轮复现：module-null-sink `device.description=中文测试音箱`），字面 `(null)` 原样进入 JSON → QML；文本模式 `pactl list sinks` 任意 locale 下均原样输出 UTF-8。
+- **修复**：`platform/src/daemon/PlatformServerAudio.cpp:144-207`（重放第 2 条处方）——sink 列表调用由 `--format=json list sinks` 改为 `list sinks`（:175）；finished 回调按 first 标志拆分：首次 `--format=json info` JSON 解析不变（仅取 ASCII 的 default_sink_name），第二次按行解析文本输出（`Sink #` 头 flush、单 tab 缩进顶层字段 `\tName:`/`\tDescription:`，`\t\t` 深缩进属性块跳过，`QString::fromUtf8` 解码），构建与原 JSON 路径完全相同的 outputs 数组；非零退出/空解析沿用原 audio-unavailable 错误回复。无其他代码改动。
+- **验证**：`cmake --preset dev` 配置通过、`cmake --build --preset dev` 通过（PlatformServerAudio.cpp 重编 [12/14]、kos-platform 重链接 [13/14]，exit=0）。逻辑验证 `tmp/bugfix-shots/verify_audio_outputs_utf8.cpp`（解析块逐字复制自修复后代码，对真实 pactl 输出断言）：创建 `device.description=中文测试音箱` 的 module-null-sink，解析结果 `description=[中文测试音箱]`、默认 sink isDefault=1 正确，输出 `AUDIO_OUTPUTS_UTF8_PASS`；修前同场景 JSON 路径返回 `(null)` 已先实测复现。测试 sink 已卸载，系统无残留。合同测试不适用（纯 C++ 后端改动，不涉及 QML 视觉）。
+- **残留风险**：daemon 为常驻进程，需重启 kos-platform 后新逻辑才生效（本机旧实例未动）；依赖顶层字段单 tab 缩进锚点与 `Sink #` 头分隔，若未来 pactl 改变文本格式需同步；无描述字段的 sink 回退为 name（与原 JSON 路径行为一致）。本轮改动由循环脚本在 verify 通过后提交（iter 223）。
 
 ### 222. [第 222 轮] [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 重放 hoverHitRegion hoverProgress 门控（已修，2026-10-19）
 - **开工核验**：`grep -c "hoverProgress > 0" shell/desktop/modules/dock/DockWindow.qml` = 0，确认第 220 轮修复因旧回退循环未存活；另核验第 221 轮两处修复均已存活（`surfaceshape.cpp:177/206` scaleChanged 连接在树、iter 221 已提交），回退循环确认解除。
