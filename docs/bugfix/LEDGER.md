@@ -20,6 +20,12 @@
 - **验证**：不适用（零代码改动，未编译）。下轮建议入口：在虚拟 KWin 会话运行 shell 并打开壁纸预览，开启 shape trace（`blur.cpp:2239-2249`，`path` 字段直接打印 "region" 或 "shapes"），一步确证路径归属；若为 "shapes" 则排除法有漏洞需重查，若为 "region" 则按 trace 里 `declared`/`effectShape` 数值定位声明未生效的原因。
 - **残留风险**：排除法基于代码走读与截图放大，未逐像素复现；shape trace 需真实会话（quickshell software 后端不经过合成器玻璃管线，无法替代）。
 
+### 103. [第 108 轮] [#214] 壁纸预览渲染毛边 —— trace 证据闭合：容差拒绝→region 路径（radius 0 无 AA），未修（超时闸收尾，2026-10-19）
+- **定位（trace 实证，承接第 102 轮）**：复跑前轮留下的 `run-issue214-trace.py`（KOS_GLASS_TRACE=1 虚拟 KWin，日志 `tmp/bugfix-shots/issue214-kwin.log`）拿到决定性证据：(a) 面板出现的前 ~4 帧，trace 打出 `declared shape set does not match the blur region; shapes: QRect(280,370 720x160) region: KWin::Rect(407,459 577x128)`（偏差 143px 远超 5%/8px 容差，blur.cpp:1653），随后 `shapes declared but none drawable, keeping the blur region geometry`——声明被容差拒绝，玻璃整个落到 region 驱动路径；(b) 这些帧的窗口级 `shaderRadius QVector4D(0,0,0,0)`（blur.cpp:2194-2195 的回退 AA 裁剪因此失效）、材质 mesh 即整数 region rect，**整条边缘零 AA**，即用户截图里的硬台阶；(c) 动画收敛后 effectShape 720x160 与声明一致，trace 显示 `path shapes`、shape 1 radius 40 exponent 3——静止态走声明 shape 路径、有 SDF AA。毛边 = 声明/region 失配期间被容差拒绝到无 AA region 路径的帧。另核实 `SurfaceShape::setTarget`（shell/native/surface-shape/surfaceshape.cpp:171-178）只连了 x/y/width/height/visible/opacity 信号，**未连 scaleChanged**，而 sync() 的几何读取是 `mapRectToScene`（surfaceshape.cpp:418，含 scale/transform）——任何 scale-only 变化都会发布过期声明直到无关信号触发，这是声明与 region 脱步的一个真实缺口。
+- **修复**：无。剩余未决：真实 shell 的桌面 stage 是多面板同表面（WallpaperPreviewBar 三个面板 + 其他玻璃件），隐藏面板 `visible: opacity > 0` 会禁用 shape（KosRoundedBlurRegion.shapeEnabled，LiquidGlassPanel.qml:236）但其 blur Region 几何仍可能照常发布 → 声明并集与 region 并集可能**永久**失配 → 桌面表面永久落 region 路径（这才能解释用户截图中**静止**面板带毛边，单面板 trace 场景静止态是平滑的）。修复必须先证实这一点，否则改哪侧都是猜。
+- **验证**：不适用（零代码改动，未编译；trace 复跑证据见 `tmp/bugfix-shots/issue214-kwin.log` 行 7-26 失配帧、行 39-51 收敛帧对照）。下轮建议：把 trace 场景改成双面板同表面（一个 `visible: false` 面板 + 一个可见面板，复刻桌面 stage 结构）复跑 trace——若静止态仍打 "does not match"，即证实隐藏面板 region 泄漏，最小修复在客户端让隐藏面板的 blur Region 与 shape 同步停发（或 Region 随 visible 置空）；若静止态匹配，则改查真实 shell 壁纸预览打开瞬间的 scale 动画与 SurfaceShape 失步（补连 scaleChanged 一行级修复）。
+- **残留风险**：trace 场景是单面板合成复现，真实 shell 的永久失配假设未经运行验证；`declaredShapeMatchesRegion` 失配期间"region 驱动帧完全无 AA"这一缺陷本身无论触发源如何都成立，但它的最小修复（AA 化 region 路径）涉及 mesh/着色器管线，超出时间闸。
+
 ## 修复记录（每修完一项在此登记）
 
 > ⚠ 循环：第 1 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-1.diff
@@ -841,3 +847,5 @@
 - **残留风险**：新 StatusCollectionPopup 与旧编辑器是不同交互范式，未在运行环境端到端复核"右缘屏幕上弹层不溢出"（PopupAdjustment.Slide 依赖组合器 xdg-popup 定位行为，虚拟会话未验证此项）；若用户在新版本仍能复现截图样式（出现"状态栏/Done"编辑器），说明其在跑旧构建，需更新部署。
 
 > ⚠ 循环：第 107 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-107.diff
+
+> ⚠ 循环：第 108 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-108.diff
