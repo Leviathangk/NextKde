@@ -2,7 +2,17 @@
 
 ## 待修清单（用户指定 + GitHub issues）
 
-（空）
+1. [#214] 壁纸预览组件渲染毛边（bug，open）
+2. [#204] 状态栏设置显示不全，无法关闭（bug，open）
+3. [#200] Dock 智能隐藏模式：全屏唤出后缓慢移出焦点不隐藏（bug，open）
+
+> 补录说明（第 101 轮）：清单此前为"（空）"数十轮，本轮按台账定义（用户指定 + GitHub issues）从开放 issue 补录以上 bug 类条目。#205 已于第 96 轮修复、#203 已于第 3 轮确认基线已含修复，不再列入；#211/#206/#207/#208/#193/#183/#202/#201/#199/#185 为 RFC/功能请求，非 bug，不列入。
+
+### 101. [第 101 轮] [#214] 壁纸预览渲染毛边 —— 已定位到组合器侧，未修（超时闸收尾，2026-10-19）
+- **定位（部分）**：毛边 = 壁纸选择弹层各 LiquidGlassPanel（顶部分段工具条 / 图库面板 / 底部操作胶囊）圆角弧段上的锯齿台阶（issue 截图放大 `tmp/bugfix-shots/issue-214-report.png`、`crop-gal-tr.png`、`crop-bottom.png` 可见 ≈2px 台阶）。QML 侧排除：面板填充是 `LiquidGlassSurface`（Rectangle，圆角自带 AA，LiquidGlassSurface.qml:5 注释明示"preserves anti-aliased rounded corners"），cornerExponent 默认 2.0 时 `LiquidGlassPanel` 的 layer mask 也不启用（LiquidGlassPanel.qml:304）。锯齿指向组合器侧：KWin glass-effect 把客户端模糊区域按整数 rect 收取（`kwin/glass-effect/src/blur.cpp:603` `rect.toAlignedRect()`，Quickshell `RoundedBlurRegion.qml` 同样只给整数 rect+四角整椭圆 Region），而玻璃形状走精确几何 + `fwidth` 解析 AA（`shaders/onscreen_rounded.glsl:113-116`）——模糊/薄雾板的实际轮廓是整数 Region 的硬边，AA 的着色器边被硬 Region 裁剪盖住，弧段处呈现阶梯。壁纸预览面板是大半径圆角悬浮在花纹壁纸上的深色板，最显眼，故用户在此报告；推测 Dock/控制中心等同构面板同样存在（未验证）。
+- **修复**：无（时间闸到，且修复涉及 glass-effect 几何/AA 管线改造，禁止猜修复）。#214 留在待修清单首位。
+- **验证**：不适用（零代码改动，未编译）。下轮建议入口：`kwin/glass-effect/src/blur.cpp` 模糊区域的收取与网格化、`shaders/onscreen_rounded.glsl` 的 box/uniform 与实际绘制几何的一致性；也可先在 quickshell 侧核对 `RoundedBlurRegion` 整数近似与 `SurfaceShape` 精确轮廓的偏差方向（模糊板应内缩而非外扩）。
+- **残留风险**：定位基于截图与代码走查，未在运行环境中复现逐像素归属；次要嫌疑：图库缩略图 `MultiEffect` mask（WallpaperPreviewBar.qml:147-151）的遮罩边缘锯齿，与面板毛边是两回事，下轮区分。
 
 ## 修复记录（每修完一项在此登记）
 
@@ -793,3 +803,5 @@
 - **残留风险**：无。第 96 条已指出待修清单尚未补录其余 GitHub issue（#214 壁纸预览毛边、#204 状态栏设置显示不全等）——请先向台账待修清单补充新项（用户报告或 GitHub issues）再启动新一轮。
 
 > ⚠ 循环：第 100 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-100.diff
+
+> ⚠ 循环：第 101 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-101.diff
