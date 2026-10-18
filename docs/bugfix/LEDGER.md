@@ -825,3 +825,11 @@
 > ⚠ 循环：第 104 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-104.diff
 
 > ⚠ 循环：第 105 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-105.diff
+
+### 106. [第 106 轮] [#214] 壁纸预览渲染毛边 —— 排除多 shape 对齐假设，收敛到真实会话 shape 送达，未修（超时闸收尾，2026-10-19）
+- **定位（实证，承接第 103 轮）**：(1) 补跑第 105 轮遗留的多面板复刻场景（`tmp/bugfix-shots/issue214-hidden-panel.qml`：复刻 WallpaperPreviewBar 展开态 union——4 个可见面板 + 隐藏 ActionFeedbackToast 的 region 仍在 union，与 WallpaperPreviewBar.qml:72 逐成员一致）+ `KOS_GLASS_TRACE=1`（runner `run-issue214-hidden.py`，日志 `tmp/bugfix-shots/issue214-hidden-panel-kwin.log`）：稳态 `path shapes declared 3 ... contentVerts 18`（3 shape × 单 quad），无 "does not match"、无 "none drawable"（仅开场动画帧出现，与第 103 轮单面板一致）。**"多 shape 声明的对齐/容差代码在真实窗口结构性失败"的假设被排除**；隐藏面板 region 留在 union 不影响路径归属。(2) 重读 `drawBlurredRegion`/`protocolShapeUniforms`（blur.cpp:2267/2277）与 `onscreen_rounded.glsl`：shapes 路径下 content（模糊）与材质每笔绘制都带逐 shape 的 box/radius/exponent，线 124-127 的 fwidth 覆盖率是解析 AA——**shapes 路径在任何位置都不产生 1px 硬台阶**；region 网格在 shapes 路径不参与绘制（模糊画在 shape rect 上），模糊纹理按 backgroundRect 整矩形采集、无逐像素 region 掩码。(3) 因此 issue 截图（`issue-214-report.png`、`crop-gal-tr.png`，面板弧上无过渡带的硬台阶）⇒ **用户真实会话稳态在 region 路径**。虚拟会话（repo 内 quickshell + Kos.SurfaceShape 桥）两种场景稳态均为 shapes，剩余差异只能是环境性条件，最大嫌疑：`declaredSurfaceShapes` 在真实会话为空（blur.cpp:1437-1440 `shapesFor(w->surface())` 返回空，即 kos_surface_shape_v1 桥未把声明送达合成器）——该条件下 1612 分支整体跳过、窗口永久 region 路径，且 Dock/控制中心等所有玻璃面板应同病（与第 101 轮"推测同构面板同样存在"相容）。
+- **修复**：无（零代码改动；真实会话的 trace 归属未取得前，"桥未送达"与"region/shape 常态失配"无法区分，修任何一侧都是猜）。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过（ninja no work to do，零改动）。合同测试不适用。新增实证文件：`tmp/bugfix-shots/issue214-hidden-panel-kwin.log`。无截图：虚拟会话截图通道仍未打通，且虚拟会话本就不复现毛边（稳态解析路径），截图无对比价值。
+- **残留风险**：定位于排除法 + 代码走读，"declaredSurfaceShapes 为空"是最大嫌疑而非实证。下一步（需用户配合或真实会话）：在真实会话设 `KOS_GLASS_TRACE=1` 重启合成器后打开壁纸预览，读稳态 trace 行——(a) `path region declared 0` ⇒ 坐实桥未送达，排查 kos_surface_shape_v1 绑定与 quickshell/平台组件版本匹配；(b) `path region declared N(N>0)` 且同帧无 "does not match"/"none drawable" ⇒ 本轮排除法有漏洞，按 trace 的 declared/effectShape/translation 数值重查；(c) `path shapes` 仍见毛边 ⇒ 推翻"台阶⇒region 路径"前提，转向 GPU/驱动侧 fwidth 实效排查。
+
+> ⚠ 循环：第 106 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-106.diff
