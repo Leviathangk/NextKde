@@ -3,10 +3,10 @@
 ## 待修清单（用户指定 + GitHub issues）
 
 1. [#214] 壁纸预览组件渲染毛边（bug，open）
-2. [#204] 状态栏设置显示不全，无法关闭（bug，open）
-3. [#200] Dock 智能隐藏模式：全屏唤出后缓慢移出焦点不隐藏（bug，open）
+2. [#200] Dock 智能隐藏模式：全屏唤出后缓慢移出焦点不隐藏（bug，open）
 
 > 补录说明（第 101 轮）：清单此前为"（空）"数十轮，本轮按台账定义（用户指定 + GitHub issues）从开放 issue 补录以上 bug 类条目。#205 已于第 96 轮修复、#203 已于第 3 轮确认基线已含修复，不再列入；#211/#206/#207/#208/#193/#183/#202/#201/#199/#185 为 RFC/功能请求，非 bug，不列入。
+> 移除说明（第 107 轮）：#204 已确认基线（ba2c0eb 删除 StatusAreaEditor）已含修复，移出清单，见修复记录第 107 条。
 
 ### 101. [第 101 轮] [#214] 壁纸预览渲染毛边 —— 已定位到组合器侧，未修（超时闸收尾，2026-10-19）
 - **定位（部分）**：毛边 = 壁纸选择弹层各 LiquidGlassPanel（顶部分段工具条 / 图库面板 / 底部操作胶囊）圆角弧段上的锯齿台阶（issue 截图放大 `tmp/bugfix-shots/issue-214-report.png`、`crop-gal-tr.png`、`crop-bottom.png` 可见 ≈2px 台阶）。QML 侧排除：面板填充是 `LiquidGlassSurface`（Rectangle，圆角自带 AA，LiquidGlassSurface.qml:5 注释明示"preserves anti-aliased rounded corners"），cornerExponent 默认 2.0 时 `LiquidGlassPanel` 的 layer mask 也不启用（LiquidGlassPanel.qml:304）。锯齿指向组合器侧：KWin glass-effect 把客户端模糊区域按整数 rect 收取（`kwin/glass-effect/src/blur.cpp:603` `rect.toAlignedRect()`，Quickshell `RoundedBlurRegion.qml` 同样只给整数 rect+四角整椭圆 Region），而玻璃形状走精确几何 + `fwidth` 解析 AA（`shaders/onscreen_rounded.glsl:113-116`）——模糊/薄雾板的实际轮廓是整数 Region 的硬边，AA 的着色器边被硬 Region 裁剪盖住，弧段处呈现阶梯。壁纸预览面板是大半径圆角悬浮在花纹壁纸上的深色板，最显眼，故用户在此报告；推测 Dock/控制中心等同构面板同样存在（未验证）。
@@ -833,3 +833,11 @@
 - **残留风险**：定位于排除法 + 代码走读，"declaredSurfaceShapes 为空"是最大嫌疑而非实证。下一步（需用户配合或真实会话）：在真实会话设 `KOS_GLASS_TRACE=1` 重启合成器后打开壁纸预览，读稳态 trace 行——(a) `path region declared 0` ⇒ 坐实桥未送达，排查 kos_surface_shape_v1 绑定与 quickshell/平台组件版本匹配；(b) `path region declared N(N>0)` 且同帧无 "does not match"/"none drawable" ⇒ 本轮排除法有漏洞，按 trace 的 declared/effectShape/translation 数值重查；(c) `path shapes` 仍见毛边 ⇒ 推翻"台阶⇒region 路径"前提，转向 GPU/驱动侧 fwidth 实效排查。
 
 > ⚠ 循环：第 106 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-106.diff
+
+### 107. [第 107 轮] [#204] 状态栏设置显示不全，无法关闭 —— 无需修复（基线已含修复，2026-10-19）
+- **根因（结论）**：issue 截图（`tmp/bugfix-shots/issue-204-report.png`，2026-10-16 提交）中的弹层是已删除的 `shell/desktop/modules/bar/StatusAreaEditor.qml`（"Status Area / Drag to reorder, tap to show or hide" 标题 + 网络设置电池通知历史等 5 张磁贴 + 右上角 "Done" 关闭钮，与截图逐字吻合）。该组件 `implicitWidth: 424`，anchor 仅设 `edges/gravity: Edges.Bottom`、无 PopupAdjustment，锚定在屏幕右缘的任务栏单元格时弹层整体右溢出屏幕——右侧磁贴被裁（显示不全），同时右上角的 Done 按钮落在屏幕外，唯一显式关闭入口不可点（无法关闭），两症状同源。修复已随 commit ba2c0eb（2026-10-18 "feat(bar): collect status icons with inline Alt-drag interaction"，在基线 3f13e46 内）进入基线：`StatusAreaEditor.qml` 整体删除（qmldir 同步移除，全仓无残留引用），交互替换为 SysTray 内联 Alt+拖拽 + 300px 宽的 `StatusCollectionPopup`——固定 6 列×40px+间距共 270 ≤ 视口 276 不会截断磁贴；锚定带 `PopupAdjustment.Slide` 由组合器约束在屏幕内；关闭有四条独立路径（再点 toggle、Escape 快捷键 SysTray.qml:315-322、点击外部 closeCollectionOutside SysTray.qml:306-310、活动窗口变更/全局指针按下 SysTray.qml:323-333），不再依赖单一屏上按钮。
+- **修复**：无代码改动（bug 随旧编辑器删除而不存在于当前代码，禁止顺手改无关代码，故仅登记）。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过（ninja no work to do，零改动）；`node shared/qml/test_visual_contract.mjs` 仅存在台账第 1 条登记的 main 既有失败（"built-in status tooltips use a black background"），无新失败。走查核对：旧组件源文（`git show ba2c0eb^:shell/desktop/modules/bar/StatusAreaEditor.qml`）与 issue 截图标题/磁贴/Done 布局逐项吻合，截图右缘裁切与其 424px 无调整锚定一致；新弹层几何与关闭路径见根因栏。
+- **残留风险**：新 StatusCollectionPopup 与旧编辑器是不同交互范式，未在运行环境端到端复核"右缘屏幕上弹层不溢出"（PopupAdjustment.Slide 依赖组合器 xdg-popup 定位行为，虚拟会话未验证此项）；若用户在新版本仍能复现截图样式（出现"状态栏/Done"编辑器），说明其在跑旧构建，需更新部署。
+
+> ⚠ 循环：第 107 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-107.diff
