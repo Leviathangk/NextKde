@@ -2,8 +2,8 @@
 
 ## 待修清单（用户指定 + GitHub issues）
 
-### A. [#214] 壁纸预览渲染毛边（第 217 轮审计后恢复；根因已实证、处方已定）
-- **状态**：开放。第 111 轮移除说明所称"已修入 surfaceshape.cpp"的 scaleChanged 连接**不在当前代码树中**（见第 213 条审计）；本轮（217）已重放该两行修复，若循环再次回退，下轮先 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 核验，缺失则按第 109 条处方原样重放。
+### A. [#214] 壁纸预览渲染毛边 —— 已修复，见修复记录第 218 条（第 218 轮移出待修清单）
+- **状态**：已修。本轮核验 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 确认第 109 条处方的连接缺失于代码树（第 217 轮审计成立），按处方原样重放两处各一行连接，编译通过。
 - **根因**：见修复记录第 103/108 条（trace 实证：声明/region 失步→容差拒绝→无 AA region 路径）及第 109 条（`setTarget`/`rewireAncestors` 漏连 `scaleChanged`，`mapRectToScene` 折叠 scale）。
 - **处方**：修复记录第 109 条（两处各一行 connect）。
 
@@ -45,6 +45,12 @@
 - **残留风险**：定位为纯走读推演，(a)/(b) 均未实证。下轮入口：搭最小场景（真实 `DockAutoHideController` + `DockRevealHandle` + mask/Region 布线，mock `WindowService.records` 注入一条全屏记录），程序化驱动 handleEntered→Held→handleExited/pointerInside 翻转并复刻 DockContainer 的 80ms 宽限逻辑，断言 ~1s 内 phase 到 Hidden（控制器自带 `[DockAutoHide] X -> Y ... inhibit=` 日志可直接看哪个 inhibitor 残留）；若纯控制器仿真通过，则失败在真实输入管线（HoverHandler vs mask），需 libei/KWin script 级真实指针注入再查。
 
 ## 修复记录（每修完一项在此登记）
+
+### 218. [第 218 轮] [#214] 壁纸预览渲染毛边 —— 重放第 109 条处方：补连 scaleChanged（已修，2026-10-19）
+- **根因**：与修复记录第 109 条相同（本轮核验代码树后确认该修复未存活，第 217 轮审计成立）：`shell/native/surface-shape/surfaceshape.cpp` 的 `setTarget`（本轮 163-192 行）与 `rewireAncestors`（本轮 194-209 行）只连了 x/y/width/height/visible/opacity（祖先链为 x/y/visible/opacity），漏 `QQuickItem::scaleChanged`；而 sync() 读取几何用 `mapRectToScene`（surfaceshape.cpp:418，折叠 item 及祖先 scale）。纯 scale 变化（WallpaperPreviewBar 的 jelly stretch `scale: 1 + jellyStretch * 0.20`、开合动画 `scale: 0.94 + 0.06 * opacity`）因此不触发重新发布，声明几何过期 → 与 blur region 失配 → `declaredShapeMatchesRegion` 容差拒绝 → 玻璃落无 AA 的 region 驱动路径 → 弧段硬台阶（第 102/103/108 条 trace 实证的因果链）。
+- **修复**：`shell/native/surface-shape/surfaceshape.cpp` 仅两处、各一行连接（按第 109 条处方原样重放）：① `setTarget` 内 heightChanged 之后补 `connect(m_target, &QQuickItem::scaleChanged, this, &SurfaceShape::scheduleSync);`（surfaceshape.cpp:175，附注释说明 mapRectToScene 折叠 scale）；② `rewireAncestors` 内祖先 yChanged 之后补 `m_ancestorConnections.append(connect(item, &QQuickItem::scaleChanged, this, &SurfaceShape::scheduleSync));`（surfaceshape.cpp:204-205）。无其他改动。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过（surfaceshape.cpp 重编、libkos_surface_shape.so 重链接，日志见 build 输出 [12/14]/[13/14]）。合同测试不适用（纯 C++ 原生桥改动，无 QML 视觉变化）。无截图：修复生效在合成器 shape 协议层，quickshell software 后端不经 KWin 玻璃管线；人工/trace 验证步骤：真实会话设 `KOS_GLASS_TRACE=1` 重启合成器，打开壁纸预览触发 jelly stretch（点按预览项），确认动画期间 trace 不再出现 "declared shape set does not match the blur region"，稳定帧保持 `path shapes`。
+- **残留风险**：同第 109 条——本修复消除"scale-only 变化导致声明过期失步"的实证缺口，用户会话毛边是否全部由它贡献未逐帧归属；若修后仍见毛边，按第 106 条 (a)/(b)/(c) trace 分支继续。`rotationChanged` 同样未连（mapRectToScene 亦折叠 rotation），本仓库玻璃面板未发现 rotation 使用，未顺手加。历轮修复曾反复回退（218 条警告），下轮应先 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 核验本修复是否存活。
 
 > ⚠ 循环：第 1 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-1.diff
 
@@ -1720,3 +1726,5 @@
 - **残留风险**：(1) 本修复与第 109 条同源——若循环机制本轮再次回退代码，修复又将不在树中；下轮开工先 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 核验（缺失则按第 109 条处方重放，勿视为新 bug）。(2) 该修复只消除 scale-only 失步这一实证缺口，用户真实会话毛边是否全由它贡献未逐帧归属（第 106 条三分支 trace 方案仍有效）。(3) #200 尚未修，为待修清单现最前项。
 
 > ⚠ 循环：第 217 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-217.diff
+
+> ⚠ 循环：第 218 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-218.diff
