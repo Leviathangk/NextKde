@@ -1,7 +1,8 @@
 # Bug 修复台账（claude/bugfix-batch1，基于 main @ 3f13e46）
 
 ## 待修清单（用户指定 + GitHub issues）
-3. **#203 任务栏网速小部件固定宽度** —— 宽度随网速抖动导致左侧图标晃动。最小修：布局宽度钳制/等宽数字。
+
+（空）
 
 ## 修复记录（每修完一项在此登记）
 
@@ -22,3 +23,11 @@
 - **残留风险**：daemon 为常驻进程，需重启 kos-platform 后新逻辑才生效（本机旧实例未动）。依赖顶层字段的单 tab 缩进锚点，若未来 pactl 改变文本格式缩进需同步；多行/含 `\r` 的 description 未特殊处理（现有设备均不出现）。
 
 > ⚠ 循环：第 3 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-3.diff
+
+### 3. [#203] 任务栏网速小部件固定宽度 —— 无需修复（基线已含修复，2026-10-19）
+- **根因（结论）**：本项已在基线内由 PR #222（commit `1a15327` "fix(bar): keep the network speed readout on fixed columns"，经 merge `961229e` 进入基线 3f13e46）修复：`shell/desktop/modules/bar/NetworkTraffic.qml:46-120` 将读数改为三个固定列（方向标签/数字/单位），列宽由 `NetworkService.formatRate` 可能产生的最宽输出（1023.99 各档位）经 `FontMetrics` 一次性预留（`rateBranches`/`labelColumnWidth`/`numberColumnWidth`/`unitColumnWidth`），数字右对齐、等宽字位（`tnum`，Qt<6.7 降级为比例数字仍由固定列兜底）；根组件 `implicitWidth` 只由这些常量与固定宽箭头 Canvas（13px）构成，与 1 Hz 采样值无关。下游宽度链路同样固定：`BarStatusArea.qml:148` `cellExtraWidth` = 该 `implicitWidth` + spacing → `SysTray.qml:49-56` `slotWidth() = itemSize + extra`，逐采样不再变化。本轮逐处核对了速率的全部消费点：`NetworkStatus.qml:133` 的速率仅出现在 tooltip（弹层，不影响任务栏布局）；`NetworkTrafficPanel.qml`/`TemperatureSensorPopups.qml` 也在弹层内且自带固定 `Layout.preferredWidth`。
+- **修复**：无代码改动（台账待修清单滞后于基线，该 bug 已不存在）。禁止顺手改无关代码，故仅登记。
+- **验证**：`cmake --preset debug` + `cmake --build --preset debug` 通过；代码走查确认 `NetworkTraffic.implicitWidth` 是采样无关常量（`NetworkService.formatRate` 最大输出 "1023.99 GB/s" 被 `rateBranches` 四档全覆盖）。合同测试 `shared/qml/test_visual_contract.mjs` 仅存在台账第 1 条已登记的 main 既有失败（"built-in status tooltips use a black background"，ba5f538 改配色未同步测试），与本项无关。无截图：本轮零代码改动，截图无从对比；如仍观察到晃动，请提供新录屏——残留风险一栏列了排查入口。
+- **残留风险**：若用户在新代码上仍见"晃动"，可能来自本项之外的其他单元（如时钟、温度读数或 Global Menu 宽度预算），需新的复现再开新项；`tnum` 在 Qt < 6.7 降级为比例数字，理论上数字列内字符 advance 有亚像素差异，但列宽固定、右对齐下不会传导到外部布局。
+
+> ⚠ 循环：第 4 轮未通过编译/测试，改动已回退，本文件里属于该轮的"已改"条目作废。留证 tmp/failed-round-4.diff
