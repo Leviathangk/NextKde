@@ -2,15 +2,14 @@
 
 ## 待修清单（用户指定 + GitHub issues）
 
-### A. [#214] 壁纸预览渲染毛边 —— 修复再次未存活，待重放（第 220 轮核验）
-- **状态**：开放。第 220 轮开工后复核 `grep -c scaleChanged shell/native/surface-shape/surfaceshape.cpp` = **0**——第 219 轮修复在本轮构建期间（该文件被重编）仍被回退，第 220 次回退警告成立。本轮按铁律只修一项（#200），未重放本项。
-- **根因**：见修复记录第 103/108 条及第 109 条（`setTarget`/`rewireAncestors` 漏连 `scaleChanged`，`mapRectToScene` 折叠 scale）。
-- **处方**：修复记录第 109 条（两处各一行 connect）。下轮开工先 `grep -n scaleChanged shell/native/surface-shape/surfaceshape.cpp` 核验；若再次为零，应按第 219 条残留风险提示排查循环脚本对工作区的还原策略，而非无限重放。
+### A. [#214] 壁纸预览渲染毛边 —— 已修，见修复记录第 221 条（第 221 轮）
+- **状态**：已修。第 221 轮查明历轮"修复未存活"的真正根因（循环脚本 verify 用不存在的 `dev` 预设 → 每轮 `git reset --hard` 清树），在 `CMakePresets.json` 补 `dev` 别名预设解除回退循环，并按第 109 条处方重放 `surfaceshape.cpp` 两处一行 connect。本轮修复已可存活（verify 通过后由循环脚本提交）。
+- **根因**：见修复记录第 221 条（含代码根因与存活根因两层）。
 
-### B. [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 已修，见修复记录第 220 条（第 220 轮）
-- **状态**：已修。第 220 轮按第 110 条处方将 `hoverHitRegion` 宽/高条件加 `dockContainer.hoverProgress > 0` 门控（`DockWindow.qml:369-376`，含注释共 8 行），编译通过、合同测试无新增失败。
-- **根因**：见修复记录第 108/110 条（hoverHitRegion 输入包络自反馈环）。
-- **处方**：已落实，见修复记录第 220 条。
+### B. [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— 修复再次未存活，待重放（第 221 轮核验）
+- **状态**：开放。第 221 轮开工复核 `grep -c "hoverProgress > 0" shell/desktop/modules/dock/DockWindow.qml` = 0——第 220 轮修复同因（verify `dev` 预设失败 → reset --hard）被回退，第 221 次回退警告成立。**第 221 轮已解除回退循环（CMakePresets.json 补 dev 预设）**，下轮按第 220 条处方原样重放 `DockWindow.qml` hoverHitRegion 门控即可存活。
+- **根因**：见修复记录第 108/110/220 条（hoverHitRegion 输入包络自反馈环）。
+- **处方**：修复记录第 220 条（`hoverHitRegion` 宽/高条件加 `dockContainer.hoverProgress > 0` 门控）。
 
 > 审计说明（第 217 轮）：修复记录第 1、2、109、110 条所载代码修复经逐项核验**均不存在于当前工作树，也不存在于任何 git 引用历史**（`git log --all -S` 对各修复特征串为零命中；`PlatformServerAudio.cpp:160` 仍为修复前 `--format=json list sinks`，DockIcon.qml 无 `_dockOwnsNameLabel`，DockWindow.qml 无 hoverProgress 门控，surfaceshape.cpp 无 scaleChanged 连接）。全 1–216 轮均有"改动已回退"警告（218 条），即历轮代码修复未存活、仅台账文档提交留存。因此第 111/114 轮移除说明的前提（修复已入代码）不成立，#214/#200 恢复为待修项；其余"已修"记录（1、2）涉及的 issue（#224 等）在开放 issue 集合中的状态以第 215/216 轮 GitHub 复核为准，不在本轮扩大处理范围。
 
@@ -45,6 +44,14 @@
 - **残留风险**：定位为纯走读推演，(a)/(b) 均未实证。下轮入口：搭最小场景（真实 `DockAutoHideController` + `DockRevealHandle` + mask/Region 布线，mock `WindowService.records` 注入一条全屏记录），程序化驱动 handleEntered→Held→handleExited/pointerInside 翻转并复刻 DockContainer 的 80ms 宽限逻辑，断言 ~1s 内 phase 到 Hidden（控制器自带 `[DockAutoHide] X -> Y ... inhibit=` 日志可直接看哪个 inhibitor 残留）；若纯控制器仿真通过，则失败在真实输入管线（HoverHandler vs mask），需 libei/KWin script 级真实指针注入再查。
 
 ## 修复记录（每修完一项在此登记）
+
+### 221. [第 221 轮] [#214] 壁纸预览渲染毛边 —— 重放 scaleChanged 补连；并查明历轮"修复未存活"根因（dev 预设缺失→reset --hard 清树），补 dev 别名预设解除回退循环（已修，2026-10-19）
+- **存活根因（历轮 220 次"改动已回退"的真正原因，非代码 bug）**：循环脚本 `~/apps/agent-loop-bugfix.sh` 的 `verify_round`（第 42 行）跑 `cmake --build --preset dev`，而本仓库只有 debug/release/apps-dev/… 预设、**无 `dev` 构建预设**，每轮 verify 必失败（loop.log 反复出现 "No such build preset: \"dev\""）→ 脚本第 99 行 `git reset --hard` 把本轮**全部代码改动**抹掉；而 `.bugfix/` 在 `.git/info/exclude` 中被 git 忽略，reset 不触及 → 只有台账文字存活、代码修复每轮清零。第 217 轮审计"修复不存在于任何 git 引用历史"由此完全解释：历轮代码从未通过 verify、从未被提交。脚本正在运行（PID 168331）不能原地编辑（bash 按字节偏移续读运行中脚本，编辑会错乱执行），故最小修法落在仓库侧。
+- **修复 1（解除回退循环）**：`CMakePresets.json` 补 `dev` 别名——configurePresets 加 `{"name":"dev","displayName":"KOS Dev (alias of debug)","inherits":"debug"}`（binaryDir/cacheVariables 随 inherits 指向 .build/debug），buildPresets 加 `{"name":"dev","configurePreset":"dev"}`。此后循环脚本的 `cmake --preset dev`/`--build --preset dev` 与 `verify_round` 真实可用，verify 通过后脚本会 `git add -A` + commit "iter N"，修复得以存活并推送。
+- **代码根因（#214 本体，同第 109/218/219 条）**：`shell/native/surface-shape/surfaceshape.cpp` 的 `setTarget` 与 `rewireAncestors` 只连 x/y/width/height/visible/opacity，漏 `QQuickItem::scaleChanged`；sync() 用 `mapRectToScene`（surfaceshape.cpp:418）折叠 item 及祖先 scale。纯 scale 变化（WallpaperPreviewBar jelly stretch / 开合动画）不触发重新发布 → 声明几何过期 → 与 blur region 失配 → `declaredShapeMatchesRegion` 容差拒绝 → 玻璃落无 AA region 路径 → 弧段硬台阶。
+- **修复 2（#214 本体，按第 109 条处方重放）**：① `setTarget` 内 heightChanged 之后补 `connect(m_target, &QQuickItem::scaleChanged, this, &SurfaceShape::scheduleSync);`（surfaceshape.cpp:175，附 2 行注释）；② `rewireAncestors` 内祖先 yChanged 之后补 `m_ancestorConnections.append(connect(item, &QQuickItem::scaleChanged, this, &SurfaceShape::scheduleSync));`（surfaceshape.cpp:204-205）。无其他代码改动。
+- **验证**：`cmake --preset dev` 配置通过（本alias 首次验证）、`cmake --build --preset dev` 通过（surfaceshape.cpp 重编、libkos_surface_shape.so 重链接 [12/14]/[13/14]）——同时实证循环脚本 verify 路径已恢复可用。合同测试 `node shared/qml/test_visual_contract.mjs` 唯一失败仍为台账第 1 条已登记的 main 既有失败（"built-in status tooltips use a black background"），无新增失败。无截图：修复生效在合成器 shape 协议层与构建配置，quickshell software 后端不经 KWin 玻璃管线；人工/trace 验证：真实会话 `KOS_GLASS_TRACE=1` 重启合成器，打开壁纸预览触发 jelly stretch，确认动画期间 trace 不再出现 "declared shape set does not match the blur region"、稳定帧保持 `path shapes`。
+- **残留风险**：(1) #214 毛边归因与第 219 条相同：本修复消除"scale-only 失步"实证缺口，用户会话毛边是否全部由它贡献未逐帧归属，若修后仍见毛边按第 106 条 (a)/(b)/(c) trace 分支继续；(2) `rotationChanged` 同样未连（mapRectToScene 折叠 rotation），仓库内未发现 rotation 使用，未顺手加；(3) 本轮改动由循环脚本在 verify 通过后提交（iter 221），若脚本在提交前被外部干预仍可能丢失，但回退循环已解除、后续轮可重放；(4) 待修清单 B 项（#200）第 220 轮修复同因被回退，本轮未重放（一轮一项），下轮按第 220 条处方重放即可，且将首次真正存活。
 
 ### 220. [第 220 轮] [#200] Dock 智能隐藏：全屏唤出后缓慢移出不隐藏 —— hoverHitRegion 加 hoverProgress 门控，断开输入包络自反馈环（已修，2026-10-19）
 - **根因**：`DockWindow.qml` 的 `hoverHitRegion`（输入 mask 的一部分，旧 369-370 行）宽/高条件为 `pointerInside && revealProgress > 0`——只要 `pointerInside` 为真且 dock 处于显现态，就把输入 mask 扩到 dock 玻璃上方的 `hoverHeadroom` 带 + `effectiveHoverScale` 水平扩展带（`dockHoverRegion`，DockWindow.qml:348-364）。而 `pointerInside` 来自挂在整窗 contentItem 上的 `_dockPointerHover`（DockContainer.qml），指针停在这条**不可见包络内**任意一点都持续刷新 hovered ⇒ `pointerInside` 永真 ⇒ 包络永存——自反馈环。全屏冲突场景 dock 唯一经 inhibitor 唤出并落 "Held" 相位（DockAutoHideController.qml），缓慢移出即停在该包络内 ⇒ Held 永不退出 ⇒ 不隐藏；快移一步跨出包络则正常隐藏，与 issue 的"全屏 + 缓慢"限定吻合（候选 (a)，第 108 条定位）。
