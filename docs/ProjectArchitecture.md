@@ -57,7 +57,6 @@ versions, error codes, and default shortcut definitions.
 | `kos-data-service` | systemd `--user` resident | telemetry, activity ledger, desktop snapshots, weather cache |
 | `kos-settings` | on demand | settings UI; communicates with Shell IPC only |
 | `kos-calendar`, `kos-todo`, `kos-weather`, `listenfree` | on demand | optional independent Qt Quick applications; ListenFree is the default music app |
-| `kos-music` | on demand | optional legacy music app, retained for separate builds |
 | `kos-pim-service` | D-Bus activated | shared Calendar/Todo storage and reminders |
 | KWin effect `.so` files | KWin managed | compositor effects, independent plugin IDs |
 

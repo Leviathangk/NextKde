@@ -13,10 +13,9 @@
 | 日历 | `kos-calendar` | `calendar-dev` |
 | 待办 | `kos-todo` | `todo-dev` |
 | 天气 | `kos-weather` | `weather-dev` |
-| 音乐（旧版，保留） | `kos-music` | `music-dev` |
 | KOS ListenFree（默认音乐应用） | `listenfree` | `listenfree-dev` |
 
-使用 `apps-dev` 可一次构建五个应用。每个应用拥有自己的可执行文件、QML
+使用 `apps-dev` 可一次构建四个应用。每个应用拥有自己的可执行文件、QML
 模块、桌面入口、测试和中英文文档。`apps/common/` 只是很小的应用运行时，
 不是功能层；应用之间不会互相导入。天气 preset 还会构建并安装 Go 数据服务，
 应用会在需要时自动启动它。
@@ -26,9 +25,9 @@
 基于 `apps/common` 的四款 KOS 应用支持直接从源码树加载 QML 并热重载，改 QML 不需要重编或重启：
 
 ```bash
-.build/music-dev/apps/music/kos-music --watch-qml apps/music/qml
+.build/weather-dev/apps/weather/kos-weather --watch-qml apps/weather/qml
 # 或者用环境变量省去参数
-KOS_APP_QML_DIR=apps/music/qml .build/music-dev/apps/music/kos-music
+KOS_APP_QML_DIR=apps/weather/qml .build/weather-dev/apps/weather/kos-weather
 ```
 
 参数指向存放 `Main.qml` 的目录（或入口文件本身）。监视树内的

@@ -15,10 +15,9 @@ manageable:
 | Calendar | `kos-calendar` | `calendar-dev` |
 | Todo | `kos-todo` | `todo-dev` |
 | Weather | `kos-weather` | `weather-dev` |
-| Music (legacy, retained) | `kos-music` | `music-dev` |
 | KOS ListenFree (default music player) | `listenfree` | `listenfree-dev` |
 
-Use `apps-dev` to build all five. Each application owns its executable, QML
+Use `apps-dev` to build all four. Each application owns its executable, QML
 module, desktop entry, tests, and bilingual documentation. `apps/common/` is a
 small application runtime rather than a feature layer; applications do not
 import one another. The Weather preset additionally builds and installs its Go
@@ -30,9 +29,9 @@ The four apps using `apps/common` can load their QML from a source tree and hot 
 edits need neither a rebuild nor a restart:
 
 ```bash
-.build/music-dev/apps/music/kos-music --watch-qml apps/music/qml
+.build/weather-dev/apps/weather/kos-weather --watch-qml apps/weather/qml
 # or skip the argument via the environment
-KOS_APP_QML_DIR=apps/music/qml .build/music-dev/apps/music/kos-music
+KOS_APP_QML_DIR=apps/weather/qml .build/weather-dev/apps/weather/kos-weather
 ```
 
 The path names the directory holding `Main.qml` (or the entry file itself).

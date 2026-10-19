@@ -140,7 +140,6 @@ QtObject {
 
         // ── 项目自有应用 ──
         "kos-calendar": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ff6b70"/><stop offset="1" stop-color="#e63c52"/></linearGradient></defs><rect x="10" y="10" width="108" height="108" rx="25" fill="#f7f7fa"/><path d="M10 35c0-14 11-25 25-25h58c14 0 25 11 25 25v18H10z" fill="url(#b)"/><path d="M35 6v18M93 6v18" stroke="#f7f7fa" stroke-width="8" stroke-linecap="round"/><text x="64" y="95" text-anchor="middle" font-family="sans-serif" font-size="48" font-weight="700" fill="#292932">15</text></svg>',
-        "kos-music": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff5f8a"/><stop offset=".52" stop-color="#c64ce5"/><stop offset="1" stop-color="#6658ef"/></linearGradient></defs><rect x="10" y="10" width="108" height="108" rx="27" fill="url(#b)"/><path d="M52 39v47c-5-3-13-2-19 2-8 5-10 13-6 19s13 6 21 1c6-4 9-9 9-15V55l38-8v30c-5-3-13-2-19 2-8 5-10 13-6 19s13 6 21 1c6-4 9-9 9-15V27z" fill="white"/></svg>',
         "kos-todo": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#69a7ff"/><stop offset="1" stop-color="#3478f6"/></linearGradient></defs><rect x="10" y="10" width="108" height="108" rx="27" fill="url(#b)"/><path d="M34 43l8 8 16-18M34 69l8 8 16-18M34 95l8 8 16-18" fill="none" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 45h27M68 71h27M68 97h20" stroke="white" stroke-opacity=".88" stroke-width="7" stroke-linecap="round"/></svg>',
         "kos-weather": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><defs><linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#5ca9ff"/><stop offset="1" stop-color="#5860ca"/></linearGradient></defs><rect x="10" y="10" width="108" height="108" rx="27" fill="url(#b)"/><circle cx="78" cy="48" r="25" fill="#ffd45e"/><path d="M31 94h63c13 0 20-8 20-18s-8-18-19-18c-4-15-16-23-31-23-18 0-32 13-34 30-10 1-17 7-17 15 0 8 7 14 18 14z" fill="#f8fbff"/><path d="M31 94h63c11 0 18-6 20-14-8 4-20 5-33 5H18c3 6 7 9 13 9z" fill="#dce7f4"/></svg>',
     })
@@ -152,7 +151,6 @@ QtObject {
     // ── 应用图标（项目自有 app，供 AppPresentationService 优先命中）──
     readonly property var appIcons: ({
         "kos-calendar": "kos-calendar",
-        "kos-music": "kos-music",
         "kos-todo": "kos-todo",
         "kos-weather": "kos-weather",
     })

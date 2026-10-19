@@ -114,7 +114,6 @@ cmake --build --preset apps-dev
 ctest --preset apps-dev
 ```
 
-The legacy local Music application uses the separate `music-dev` preset.
 
 Run `./tools/install-apps.sh` for a per-user install and service registration.
 See [apps/README.md](../apps/README.md) for dependencies and module details. Weather

@@ -290,8 +290,7 @@ KF6 libraries, Go 1.26+, and the audio dependencies documented in
 ```
 
 This invokes `tools/install-apps.sh`, checks dependencies, and prepares the
-private ListenFree SDK. The legacy local Music app remains available through
-`music-dev`; it is disabled in the default application installer.
+private ListenFree SDK.
 
 Install equivalent packages on other distributions. See the
 [Quickshell documentation](https://quickshell.org/docs/) for Quickshell.

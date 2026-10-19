@@ -38,8 +38,7 @@
         "KOS_BUILD_CALENDAR": "ON",
         "KOS_BUILD_TODO": "ON",
         "KOS_BUILD_WEATHER": "ON",
-        "KOS_BUILD_MUSIC": "OFF",
-        "KOS_BUILD_LISTENFREE": "ON"
+        "KOS_BUILD_LISTENFREE": "OFF"
       }
     },
     {
@@ -67,7 +66,6 @@
         "KOS_BUILD_CALENDAR": "ON",
         "KOS_BUILD_TODO": "OFF",
         "KOS_BUILD_WEATHER": "OFF",
-        "KOS_BUILD_MUSIC": "OFF",
         "KOS_BUILD_LISTENFREE": "OFF"
       }
     },
@@ -80,7 +78,6 @@
         "KOS_BUILD_CALENDAR": "OFF",
         "KOS_BUILD_TODO": "ON",
         "KOS_BUILD_WEATHER": "OFF",
-        "KOS_BUILD_MUSIC": "OFF",
         "KOS_BUILD_LISTENFREE": "OFF"
       }
     },
@@ -93,20 +90,6 @@
         "KOS_BUILD_CALENDAR": "OFF",
         "KOS_BUILD_TODO": "OFF",
         "KOS_BUILD_WEATHER": "ON",
-        "KOS_BUILD_MUSIC": "OFF",
-        "KOS_BUILD_LISTENFREE": "OFF"
-      }
-    },
-    {
-      "name": "music-dev",
-      "displayName": "Music only",
-      "inherits": "apps-base",
-      "binaryDir": "${sourceDir}/.build/music-dev",
-      "cacheVariables": {
-        "KOS_BUILD_CALENDAR": "OFF",
-        "KOS_BUILD_TODO": "OFF",
-        "KOS_BUILD_WEATHER": "OFF",
-        "KOS_BUILD_MUSIC": "ON",
         "KOS_BUILD_LISTENFREE": "OFF"
       }
     },
@@ -119,7 +102,6 @@
         "KOS_BUILD_CALENDAR": "OFF",
         "KOS_BUILD_TODO": "OFF",
         "KOS_BUILD_WEATHER": "OFF",
-        "KOS_BUILD_MUSIC": "OFF",
         "KOS_BUILD_LISTENFREE": "ON"
       }
     }
@@ -132,7 +114,6 @@
     { "name": "calendar-dev", "configurePreset": "calendar-dev" },
     { "name": "todo-dev", "configurePreset": "todo-dev" },
     { "name": "weather-dev", "configurePreset": "weather-dev" },
-    { "name": "music-dev", "configurePreset": "music-dev" },
     { "name": "listenfree-dev", "configurePreset": "listenfree-dev" }
   ],
   "testPresets": [

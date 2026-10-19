@@ -290,7 +290,6 @@ Calendar、Todo、Weather 和 ListenFree 是独立的可选应用，不由默认
 安装前请阅读 [apps/README.zh-CN.md](apps/README.zh-CN.md) 与
 [ListenFree Linux 构建说明](apps/listenfree/packaging/linux/README.md)，然后运行
 `./tools/kosctl install apps`（或 `./tools/install-apps.sh`）；安装器检查依赖并准备私有 SDK。
-旧版本地 Music 仅由 `music-dev` 单独构建，在默认应用安装器中关闭。
 
 其他发行版请安装对应软件包。Quickshell 的安装方式见
 [官方文档](https://quickshell.org/docs/)。
@@ -522,8 +521,6 @@ cmake --preset apps-dev -DKOS_LISTENFREE_SDK="$PWD/.build/listenfree-sdk"
 cmake --build --preset apps-dev
 ctest --preset apps-dev
 ```
-
-旧版本地 Music 仅由 `music-dev` 单独构建。
 
 用户级安装与服务注册可运行 `./tools/install-apps.sh`。依赖和模块说明见
 [apps/README.md](apps/README.md)。天气应用与 Shell 共用 `kos-data-service` 的缓存和

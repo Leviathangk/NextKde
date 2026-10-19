@@ -29,7 +29,6 @@ export KOS_LISTENFREE_SDK
 cmake --preset apps-release -S "$project_dir" -B "$build_dir" \
     -DCMAKE_INSTALL_PREFIX="$prefix" \
     -DKOS_LISTENFREE_SDK="$KOS_LISTENFREE_SDK" \
-    -DKOS_BUILD_MUSIC=OFF \
     -DKOS_BUILD_LISTENFREE=ON \
     -DBUILD_TESTING=OFF
 jobs=${CMAKE_BUILD_PARALLEL_LEVEL:-$(nproc 2>/dev/null || echo 4)}
