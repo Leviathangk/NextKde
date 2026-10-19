@@ -289,8 +289,10 @@ KF6 libraries, Go 1.26+, and the audio dependencies documented in
 ./tools/kosctl install apps
 ```
 
-This invokes `tools/install-apps.sh`, checks dependencies, and prepares the
-private ListenFree SDK.
+This invokes `tools/install-apps.sh` and checks dependencies. ListenFree is
+opt-in: pass `KOS_WITH_LISTENFREE=1` to also prepare its private SDK and
+install it, which additionally needs Qt Multimedia, Qt WebEngine, ffmpeg,
+libcurl, libpulse, libsecret, ICU and TagLib >= 2.3.1.
 
 Install equivalent packages on other distributions. See the
 [Quickshell documentation](https://quickshell.org/docs/) for Quickshell.

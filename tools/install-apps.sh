@@ -11,25 +11,44 @@ if ! command -v python3 >/dev/null 2>&1; then
     echo "Missing dependency: python3 (Arch: sudo pacman -S python; Ubuntu: sudo apt install python3)" >&2
     exit 1
 fi
-python3 "$script_dir/check-apps-dependencies.py"
+# ListenFree is opt-in: it needs a private SDK (patched qmmp, qjs, TagLib
+# >= 2.3.1) that most machines do not have, and letting it gate the whole app
+# bundle meant a missing music dependency blocked Calendar, Todo and Weather.
+# Set KOS_WITH_LISTENFREE=1 to build and install it as part of the bundle.
+listenfree=${KOS_WITH_LISTENFREE:-0}
+case "$listenfree" in
+    1|yes|true|on) listenfree=1 ;;
+    0|no|false|off|'') listenfree=0 ;;
+    *) echo "KOS_WITH_LISTENFREE must be 0 or 1" >&2; exit 1 ;;
+esac
 
-if test -n "${KOS_LISTENFREE_SDK:-}"; then
-    if test ! -d "$KOS_LISTENFREE_SDK"; then
-        echo "Configured ListenFree SDK directory does not exist: $KOS_LISTENFREE_SDK" >&2
-        exit 1
+if test "$listenfree" -eq 1; then
+    python3 "$script_dir/check-apps-dependencies.py"
+    if test -n "${KOS_LISTENFREE_SDK:-}"; then
+        if test ! -d "$KOS_LISTENFREE_SDK"; then
+            echo "Configured ListenFree SDK directory does not exist: $KOS_LISTENFREE_SDK" >&2
+            exit 1
+        fi
+    else
+        KOS_LISTENFREE_SDK="$project_dir/.build/listenfree-sdk"
+        "$script_dir/prepare-listenfree-sdk.sh" "$KOS_LISTENFREE_SDK"
     fi
+    export KOS_LISTENFREE_SDK
 else
-    KOS_LISTENFREE_SDK="$project_dir/.build/listenfree-sdk"
-    "$script_dir/prepare-listenfree-sdk.sh" "$KOS_LISTENFREE_SDK"
+    python3 "$script_dir/check-apps-dependencies.py" --without-listenfree
 fi
-export KOS_LISTENFREE_SDK
 
 # An install must not build or run tests -- they have one owner,
 # tools/run-tests.sh (the same policy the core kosctl build follows).
+if test "$listenfree" -eq 1; then
+    listenfree_cmake="-DKOS_BUILD_LISTENFREE=ON -DKOS_LISTENFREE_SDK=$KOS_LISTENFREE_SDK"
+else
+    listenfree_cmake="-DKOS_BUILD_LISTENFREE=OFF"
+fi
+# shellcheck disable=SC2086 # the flag list above is intentionally split
 cmake --preset apps-release -S "$project_dir" -B "$build_dir" \
     -DCMAKE_INSTALL_PREFIX="$prefix" \
-    -DKOS_LISTENFREE_SDK="$KOS_LISTENFREE_SDK" \
-    -DKOS_BUILD_LISTENFREE=ON \
+    $listenfree_cmake \
     -DBUILD_TESTING=OFF
 jobs=${CMAKE_BUILD_PARALLEL_LEVEL:-$(nproc 2>/dev/null || echo 4)}
 case "$jobs" in ''|*[!0-9]*) jobs=4 ;; esac
@@ -97,7 +116,11 @@ fi
 install -m 0644 "$project_dir/apps/settings/main.qml" \
     "$prefix/share/kos/settings/main.qml"
 
-python3 "$script_dir/register-default-apps.py" --prefix "$prefix"
+if test "$listenfree" -eq 1; then
+    python3 "$script_dir/register-default-apps.py" --prefix "$prefix"
+else
+    python3 "$script_dir/register-default-apps.py" --prefix "$prefix" --without-listenfree
+fi
 
-"$script_dir/verify-apps-install.sh" "$prefix"
+KOS_EXPECT_LISTENFREE="$listenfree" "$script_dir/verify-apps-install.sh" "$prefix"
 echo "KOS applications are installed for this user and ready from the launcher."

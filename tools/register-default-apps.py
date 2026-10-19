@@ -15,10 +15,14 @@ parser.add_argument('--config-home', type=Path, default=Path(os.environ.get('XDG
 parser.add_argument('--state-home', type=Path, default=Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')))
 parser.add_argument('--dry-run', action='store_true')
 parser.add_argument('--no-cache', action='store_true', help='Skip desktop cache refresh when staging a package')
+parser.add_argument('--without-listenfree', action='store_true',
+                    help='register the other applications and leave the music migration alone')
 args = parser.parse_args()
+with_listenfree = not args.without_listenfree
 prefix, config = args.prefix.resolve(), args.config_home.resolve()
 apps = ('todo', 'calendar', 'weather')
-for name in ('listenfree', *(f'kos-{name}' for name in apps)):
+required = (('listenfree',) if with_listenfree else ()) + tuple(f'kos-{name}' for name in apps)
+for name in required:
     if not os.access(prefix / 'bin' / name, os.X_OK) or not (prefix / 'share/applications' / (name + '.desktop')).is_file():
         raise SystemExit('Install the new application before registering it: ' + name)
 
@@ -36,15 +40,18 @@ def atomic(path, text):
 
 # Validate the replacement before retiring any old files. No user data is
 # stored in these exact installation paths.
-subprocess.run([str(prefix / 'bin/listenfree'), '--version'], check=True,
-               env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}, stdout=subprocess.DEVNULL)
+if with_listenfree:
+    subprocess.run([str(prefix / 'bin/listenfree'), '--version'], check=True,
+                   env={**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}, stdout=subprocess.DEVNULL)
 legacy_files = [prefix / path for path in (
     'bin/kos-music', 'bin/kos-music-lx-source-host', 'bin/kos-music-lx-source-host.js',
     'share/applications/kos-music.desktop', 'share/icons/hicolor/scalable/apps/kos-music.svg',
     'share/metainfo/org.nextkde.Kos.Music.metainfo.xml')]
 
-new_entry = ini(prefix / 'share/applications/listenfree.desktop')
-mimes = [item for item in new_entry['Desktop Entry']['MimeType'].split(';') if item]
+mimes = []
+if with_listenfree:
+    new_entry = ini(prefix / 'share/applications/listenfree.desktop')
+    mimes = [item for item in new_entry['Desktop Entry']['MimeType'].split(';') if item]
 mime_files = [config / 'mimeapps.list']
 # Desktop-specific preferences take precedence if the user already has them.
 for name in ('kde-mimeapps.list', 'nextkde-mimeapps.list'):
@@ -55,9 +62,13 @@ previews = [prefix / location / f'kos-{app}-preview{suffix}'
 preview_dir = prefix / 'opt/nextkde-ui-preview'
 paths = [*mime_files, buttons, *legacy_files, *previews]
 if args.dry_run:
-    print('Promote: kos-todo, kos-calendar, kos-weather; default music: listenfree')
-    print('Retire: legacy music binaries and registrations, and the three preview registrations; retain user data')
-    print('Audio MIME types:', ', '.join(mimes))
+    print('Promote: kos-todo, kos-calendar, kos-weather')
+    if with_listenfree:
+        print('Promote default music: listenfree')
+        print('Retire: legacy music binaries and registrations, and the three preview registrations; retain user data')
+        print('Audio MIME types:', ', '.join(mimes))
+    else:
+        print('ListenFree not installed; leaving the music default and legacy files untouched')
     raise SystemExit(0)
 
 registration_state = args.state_home / 'kos/application-registration'
@@ -79,7 +90,7 @@ for index, path in enumerate(paths):
 from io import StringIO
 initial_defaults = {mime: [ini(candidate).get('Default Applications', mime, fallback='')
                           for candidate in mime_files] for mime in mimes}
-for path in mime_files:
+for path in mime_files if mimes else ():
     preferences = ini(path)
     if migrated and not any('kos-music.desktop' in value
                             for section in preferences.sections()
@@ -111,22 +122,28 @@ for path in mime_files:
     atomic(path, stream.getvalue())
 
 button_data = json.loads(buttons.read_text()) if buttons.exists() else {}
-for name in ('listenfree', *(f'kos-{app}' for app in apps)):
+registered = (('listenfree',) if with_listenfree else ()) + tuple(f'kos-{app}' for app in apps)
+for name in registered:
     button_data.setdefault('apps', {}).setdefault(name, {}).setdefault('showButtons', False)
 for app in apps: button_data['apps'].pop(f'kos-{app}-preview', None)
 managed_rules = [{'match': {'class': f'kos-{app}', 'titleRegex': 'Preview$'}, 'showButtons': False} for app in apps]
 button_data['rules'] = [rule for rule in button_data.get('rules', []) if rule not in managed_rules]
 atomic(buttons, json.dumps(button_data, ensure_ascii=False, indent=4) + '\n')
-for path in legacy_files: path.unlink(missing_ok=True)
+if with_listenfree:
+    for path in legacy_files: path.unlink(missing_ok=True)
 for path in previews: path.unlink(missing_ok=True)
 if preview_dir.exists():
     retired = backup / 'retired-preview'
     shutil.move(str(preview_dir), retired)
     manifest['retiredPreview'] = {'path': str(preview_dir), 'backup': str(retired)}
     (backup / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-atomic(migration_marker, json.dumps({'version': 1}) + '\n')
+if with_listenfree:
+    atomic(migration_marker, json.dumps({'version': 1}) + '\n')
 if not args.no_cache:
     for command in (['update-desktop-database', str(prefix / 'share/applications')], ['kbuildsycoca6', '--noincremental']):
         if shutil.which(command[0]): subprocess.run(command, check=True)
-print('Registered KOS ListenFree; legacy music installation retired, user data and music preferences retained.')
+if with_listenfree:
+    print('Registered KOS ListenFree; legacy music installation retired, user data and music preferences retained.')
+else:
+    print('Registered KOS Calendar, Todo and Weather; ListenFree was not installed.')
 print('Registration backup:', backup)

@@ -289,7 +289,9 @@ Calendar、Todo、Weather 和 ListenFree 是独立的可选应用，不由默认
 `kosctl install` 构建。默认应用安装需要 Qt 6.10+、兼容的 KF6、Go 1.26+ 和额外音频依赖。
 安装前请阅读 [apps/README.zh-CN.md](apps/README.zh-CN.md) 与
 [ListenFree Linux 构建说明](apps/listenfree/packaging/linux/README.md)，然后运行
-`./tools/kosctl install apps`（或 `./tools/install-apps.sh`）；安装器检查依赖并准备私有 SDK。
+`./tools/kosctl install apps`（或 `./tools/install-apps.sh`）；安装器检查依赖。
+ListenFree 默认不安装，需要时用 `KOS_WITH_LISTENFREE=1` 开启，它会额外准备私有 SDK，
+并要求 Qt Multimedia、Qt WebEngine、ffmpeg、libcurl、libpulse、libsecret、ICU 与 TagLib >= 2.3.1。
 
 其他发行版请安装对应软件包。Quickshell 的安装方式见
 [官方文档](https://quickshell.org/docs/)。

@@ -2,6 +2,9 @@
 set -eu
 
 prefix=${1:-${KOS_INSTALL_PREFIX:-"$HOME/.local"}}
+# tools/install-apps.sh sets this from KOS_WITH_LISTENFREE; a direct call keeps
+# the historical behaviour of expecting the full bundle.
+expect_listenfree=${KOS_EXPECT_LISTENFREE:-1}
 failed=0
 
 for app in calendar todo weather; do
@@ -20,20 +23,24 @@ for app in calendar todo weather; do
 done
 
 # ListenFree replaces the legacy music application in the installed bundle.
-if test -x "$prefix/bin/listenfree"; then
-    test -f "$prefix/share/applications/listenfree.desktop" || failed=1
-    test -f "$prefix/share/icons/hicolor/scalable/apps/listenfree.svg" || failed=1
-    if command -v desktop-file-validate >/dev/null 2>&1; then
-        desktop-file-validate "$prefix/share/applications/listenfree.desktop" || failed=1
+# It is opt-in (KOS_WITH_LISTENFREE), so an install without it is complete and
+# keeps any legacy music files in place.
+if test "$expect_listenfree" -eq 1; then
+    if test -x "$prefix/bin/listenfree"; then
+        test -f "$prefix/share/applications/listenfree.desktop" || failed=1
+        test -f "$prefix/share/icons/hicolor/scalable/apps/listenfree.svg" || failed=1
+        if command -v desktop-file-validate >/dev/null 2>&1; then
+            desktop-file-validate "$prefix/share/applications/listenfree.desktop" || failed=1
+        fi
+        QT_QPA_PLATFORM=offscreen "$prefix/bin/listenfree" --version >/dev/null || failed=1
+    else
+        echo "Incomplete registration: listenfree" >&2
+        failed=1
     fi
-    QT_QPA_PLATFORM=offscreen "$prefix/bin/listenfree" --version >/dev/null || failed=1
-else
-    echo "Incomplete registration: listenfree" >&2
-    failed=1
-fi
-if test -e "$prefix/bin/kos-music" || test -e "$prefix/share/applications/kos-music.desktop"; then
-    echo "Legacy music application has not been retired." >&2
-    failed=1
+    if test -e "$prefix/bin/kos-music" || test -e "$prefix/share/applications/kos-music.desktop"; then
+        echo "Legacy music application has not been retired." >&2
+        failed=1
+    fi
 fi
 
 # apps/settings/main.qml runs as its own process and resolves

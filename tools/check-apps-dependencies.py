@@ -78,9 +78,25 @@ def run(command):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sdk-only', action='store_true')
+    parser.add_argument('--without-listenfree', action='store_true',
+                        help='skip the packages only the ListenFree SDK needs')
     args = parser.parse_args()
     family = distribution()
     missing = []
+    # ListenFree is opt-in (KOS_WITH_LISTENFREE). Its SDK needs a patched Qt
+    # Multimedia, WebEngine, ffmpeg, libcurl and libpulse; requiring those from
+    # every app install made a missing music dependency block Calendar, Todo
+    # and Weather.
+    # libsecret and ICU are only linked by apps/listenfree (libsecret-1 at its
+    # CMakeLists.txt:404, ICU at :665); nothing in apps/shared/services needs
+    # them.
+    listenfree_only = {
+        'Qt6Multimedia', 'Qt6WebEngineWidgets', 'libavformat', 'libavcodec',
+        'libavutil', 'libswresample', 'libcurl', 'libpulse', 'libsecret-1',
+        'icu-uc',
+    }
+    libraries = [entry for entry in LIBRARIES
+                 if not (args.without_listenfree and entry[0] in listenfree_only)]
     tools = TOOLS + ([] if args.sdk_only else [
         ('busctl', 'systemd', 'systemd'), ('systemctl', 'systemd', 'systemd'),
         ('readlink', 'coreutils', 'coreutils'), ('go', 'go', 'golang-go')])
@@ -97,7 +113,7 @@ def main():
         if match and tuple(map(int, match.groups())) < (1, 26):
             missing.append(('Go >= 1.26 (installed ' + match.group(0) + ')', 'go', 'golang-go'))
     if shutil.which('pkg-config'):
-        for probe, arch, ubuntu in LIBRARIES:
+        for probe, arch, ubuntu in libraries:
             if run(['pkg-config', '--exists', probe]).returncode:
                 missing.append((probe, arch, ubuntu))
     qt_version = run(['pkg-config', '--modversion', 'Qt6Core']).stdout.strip() if shutil.which('pkg-config') else ''
@@ -109,7 +125,12 @@ def main():
         with tempfile.TemporaryDirectory(prefix='kos-deps-') as build:
             result = run(['cmake', '-S', str(Path(__file__).parent / 'app-dependencies'),
                 '-B', build, '-G', 'Ninja', '-DKOS_SDK_ONLY=' + ('ON' if args.sdk_only else 'OFF'),
-                '-DKOS_BUILD_TAGLIB=' + ('ON' if run(['pkg-config', '--exists', 'taglib >= 2.3.1']).returncode else 'OFF')])
+                # run() returns a CompletedProcess: a successful probe has
+                # returncode 0, so compare explicitly instead of testing the
+                # object's truthiness (which reported Utf8Cpp on machines that
+                # have no taglib at all).
+                '-DKOS_BUILD_TAGLIB=' + ('ON' if run(['pkg-config', '--exists', 'taglib >= 2.3.1']).returncode == 0 else 'OFF'),
+                '-DKOS_WITH_LISTENFREE=' + ('OFF' if args.without_listenfree else 'ON')])
             for package in re.findall(r'KOS_MISSING:(\w+)', result.stdout):
                 missing.append((package, *CMAKE_PACKAGES[package]))
             if result.returncode:
