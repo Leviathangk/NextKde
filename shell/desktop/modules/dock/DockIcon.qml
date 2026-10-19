@@ -680,10 +680,12 @@ Item {
             label.updateGeometry()
     }
     onDockNameEligibleChanged: updateDockName()
+    readonly property bool _dockOwnsNameLabel: magnificationRoot !== null
+        && typeof magnificationRoot.updateNameLabel === "function"
     // Non-Dock hosts retain the existing lazy popup fallback. The shared Dock
     // never constructs this separate surface or uses its dwell timer.
     Loader {
-        active: !icon._usesSharedMagnification && icon._hovering && icon.dockNameEligible
+        active: !icon._dockOwnsNameLabel && icon._hovering && icon.dockNameEligible
             && !icon._hasWindows && !icon.isRunning
         sourceComponent: DockAppNameTooltip { targetIcon: icon }
     }
