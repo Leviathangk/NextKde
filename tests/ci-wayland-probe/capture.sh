@@ -7,6 +7,7 @@ mkdir -m 700 "$output/runtime" "$output/config" "$output/data" "$output/cache" "
 export XDG_RUNTIME_DIR="$output/runtime" XDG_CONFIG_HOME="$output/config"
 export XDG_DATA_HOME="$output/data" XDG_CACHE_HOME="$output/cache" XDG_STATE_HOME="$output/state"
 export QT_FORCE_STDERR_LOGGING=1 QT_DEBUG_PLUGINS=1 WAYLAND_DEBUG=1
+export QT_LOGGING_RULES='kwin_core.debug=true;kwin_virtual.debug=true'
 export LIBGL_ALWAYS_SOFTWARE=1 KWIN_COMPOSE=O2 QSG_RHI_BACKEND=opengl
 export WAYLAND_DISPLAY=kos-ci-probe DISPLAY=
 export KOS_PROBE_DIR="$probe" KOS_PROBE_OUTPUT="$output"
@@ -17,6 +18,13 @@ exec env QT_QPA_PLATFORM=wayland quickshell -p "$KOS_PROBE_DIR" --no-color > "$K
 EOF
 chmod 700 "$output/session.sh"
 {
+    uname -r
+    ls -l /dev/udmabuf /dev/dri 2>&1 || true
+    if (exec 9<>/dev/udmabuf); then
+        printf '/dev/udmabuf open(O_RDWR): OK\n'
+    else
+        printf '/dev/udmabuf open(O_RDWR): FAILED\n'
+    fi
     kwin_wayland --version
     quickshell --version
     command -v getcap >/dev/null && getcap "$(command -v kwin_wayland)"

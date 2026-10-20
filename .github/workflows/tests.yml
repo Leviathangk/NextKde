@@ -7,21 +7,37 @@ jobs:
   capture:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
-    container: archlinux:base-devel
     steps:
-      - name: Install the CI runtime only
-        run: pacman -Syu --noconfirm --needed git quickshell kwin python-pillow mesa libcap dbus qt6-wayland
       - uses: actions/checkout@v7
-      - name: Apply the already confirmed container capability fix
+      # KWin 6.8 GpuManager only creates its Mesa software render device after
+      # opening /dev/udmabuf. The device belongs to the runner's kernel, so it
+      # must be prepared before starting the container.
+      # https://github.com/KDE/kwin/blob/v6.8.0/src/core/gpumanager.cpp#L73-L86
+      - name: Prepare the runner's software rendering device
         run: |
-          binary=$(command -v kwin_wayland)
-          if [ -n "$(getcap "$binary")" ]; then setcap -r "$binary"; fi
+          mkdir -p tests/ci-wayland-probe/host
+          {
+            uname -r
+            sudo modprobe udmabuf
+            test -c /dev/udmabuf
+            ls -l /dev/udmabuf
+          } 2>&1 | tee tests/ci-wayland-probe/host/device.log
       - name: Capture one minimal Wayland session
-        run: sh tests/ci-wayland-probe/capture.sh
+        run: |
+          docker run --rm --device=/dev/udmabuf \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/work" \
+            --workdir /work archlinux:base-devel bash -ceu '
+              pacman -Syu --noconfirm --needed quickshell kwin python-pillow mesa libcap dbus qt6-wayland
+              binary=$(command -v kwin_wayland)
+              if [ -n "$(getcap "$binary")" ]; then setcap -r "$binary"; fi
+              sh tests/ci-wayland-probe/capture.sh
+            '
       - name: Upload logs from this attempt
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ci-wayland-minimal-logs
-          path: tests/ci-wayland-probe/logs.*/
+          path: |
+            tests/ci-wayland-probe/logs.*/
+            tests/ci-wayland-probe/host/
           if-no-files-found: warn
