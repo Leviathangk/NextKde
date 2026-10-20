@@ -3,6 +3,27 @@
 set -eu
 probe=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 output=$(mktemp -d "$probe/logs.XXXXXX")
+# Always publish plain log files, including on a failed startup. Keep runtime
+# sockets/config private; the host uploader only sees the separate readable copy.
+publish_logs() {
+    result=$?
+    trap - EXIT
+    mkdir -p "$probe/artifacts"
+    chmod 755 "$probe/artifacts"
+    for name in versions server client; do
+        if [ -f "$output/$name.log" ]; then
+            printf '\n::group::%s.log\n' "$name"
+            cat "$output/$name.log"
+            printf '\n::endgroup::\n'
+            cp "$output/$name.log" "$probe/artifacts/$name.log"
+            chmod 644 "$probe/artifacts/$name.log"
+        fi
+    done
+    printf 'exit=%s\n' "$result" | tee "$probe/artifacts/result.log"
+    chmod 644 "$probe/artifacts/result.log"
+    exit "$result"
+}
+trap publish_logs EXIT
 mkdir -m 700 "$output/runtime" "$output/config" "$output/data" "$output/cache" "$output/state"
 export XDG_RUNTIME_DIR="$output/runtime" XDG_CONFIG_HOME="$output/config"
 export XDG_DATA_HOME="$output/data" XDG_CACHE_HOME="$output/cache" XDG_STATE_HOME="$output/state"

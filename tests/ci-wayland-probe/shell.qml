@@ -10,6 +10,9 @@ ShellRoot {
     Timer {
         interval: 2000
         running: true
-        onTriggered: Qt.quit()
+        onTriggered: {
+            console.log("CI_WAYLAND_MINIMAL_FINISHED")
+            Qt.quit()
+        }
     }
 }

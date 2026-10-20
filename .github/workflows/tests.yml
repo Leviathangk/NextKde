@@ -14,11 +14,14 @@ jobs:
       # must be prepared before starting the container.
       # https://github.com/KDE/kwin/blob/v6.8.0/src/core/gpumanager.cpp#L73-L86
       - name: Prepare the runner's software rendering device
+        shell: bash
         run: |
           mkdir -p tests/ci-wayland-probe/host
           {
             uname -r
-            sudo modprobe udmabuf
+            if [ ! -c /dev/udmabuf ]; then
+              sudo modprobe udmabuf
+            fi
             test -c /dev/udmabuf
             ls -l /dev/udmabuf
           } 2>&1 | tee tests/ci-wayland-probe/host/device.log
@@ -38,6 +41,6 @@ jobs:
         with:
           name: ci-wayland-minimal-logs
           path: |
-            tests/ci-wayland-probe/logs.*/
+            tests/ci-wayland-probe/artifacts/
             tests/ci-wayland-probe/host/
           if-no-files-found: warn
