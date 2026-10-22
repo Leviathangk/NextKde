@@ -96,7 +96,7 @@ Python >=3.9；CMake >=3.21；Node >=22.19；Git、pkg-config、Make、C++20 编
 
 ## 验证状态
 
-本轮仅完成实现与源码/语法检查，未在本机执行安装、卸载、依赖探测或运行验证。自动化测试文件为 `tests/app-store/test_kmusic_installer.py`，按用户偏好在虚拟机执行。还需在 Arch、Ubuntu、Debian 干净虚拟机覆盖：缺依赖、旧版本、完整安装、重复安装、失败回滚、路径含空格、已有桌面入口冲突、并发锁、卸载保留用户数据。未完成这些测试前，不应标记为各发行版已验收。
+已在 GitHub 托管虚拟机中的 Arch、Ubuntu 26.04、Debian 13 容器完成安装成功及失败场景验证；Ubuntu 24.04 验证依赖过旧时拒绝安装。未在开发宿主机运行测试。测试文件位于 `tests/app-store/`，实际结果见下方记录。
 
 ## 本机交接路径
 
@@ -112,3 +112,46 @@ KMUSIC_SOURCE_DIR=/path/to/KMusic python3 -m unittest discover -s tests/app-stor
 ```
 
 默认查找与 kos-shell 仓库并列的 KMusic 文件夹；也可用 KMUSIC_SOURCE_DIR 指定实际路径。测试不自动下载 KMusic。
+
+## 持续集成安装测试矩阵
+
+KMusic 仓库 `.github/workflows/installer-matrix.yml` 在 GitHub 托管虚拟机内运行发行版容器，测试源码位于本仓库 `tests/app-store/`，由工作流固定完整提交引用。它不是宿主机验证，也不是三种发行版的完整桌面视觉验收。
+
+| 环境 | 预期验证 |
+|---|---|
+| Arch Linux / x86_64 | 缺依赖失败 + 完整依赖后的真实下载/编译/安装/覆盖升级/卸载 |
+| Ubuntu 26.04 / x86_64 | 同上 |
+| Debian 13 / x86_64 | 同上；成功夹具显式预装官方 Node 22.19，不能把发行版默认 Node 20 当成满足条件 |
+| Ubuntu 24.04 / x86_64 | 缺依赖及系统 Qt 版本过低时统一拒绝安装 |
+
+`provision-kmusic-ci.sh` **仅用于临时测试环境**，由 CI 的 root 安装成功场景所需依赖；实际被测 `install.sh` 以普通用户运行，仍然绝不自动安装依赖。它们不是同一个脚本，也不应把测试环境准备脚本分发为商店安装器。
+
+- 契约单元测试覆盖：支持/不支持平台、缺依赖/旧版本、参数/root/权限/锁错误、首次安装、重复安装、升级、下载/校验/构建/暂存失败、发布阶段回滚、取消、卸载与用户数据保留。
+- 真实安装测试覆盖：实际 Git 固定提交和子模块下载、实际 CMake 编译、安装文件及桌面入口、动态库解析、无界面启动冒烟检查、两不同提交的覆盖升级、重复安装、下载/编译故障注入、锁冲突、目录权限、卸载幂等及非托管桌面入口保护。
+- `results/unit.log` 是模拟契约测试；`missing/summary.json`、`old/summary.json`、`full/summary.json` 是实际调用脚本的结果，不能混为一类。每个调用都有 JSONL、stderr 和安装日志。
+- `container-image.json` 记录实际镜像 ID/digest，便于追溯 Arch 滚动版本和可更新镜像标签。
+- 尚不覆盖 ARM64 实机、断电/SIGKILL 恢复、桌面菜单自动刷新、真实音频输出或登录凭据库；不要依据安装成功推断这些能力通过。
+
+当前结果以工作流及上传的证据为准；增加测试文件或启动工作流不等于通过。
+
+## 2026-10-22 实际验证结果
+
+[最终工作流：四项全部通过](https://github.com/NextKde/KMusic/actions/runs/39783294345)。
+详细机器可读结果及镜像 digest：[KMusicInstallerTestResults.json](KMusicInstallerTestResults.json)。
+
+- 被测 KMusic：`49264b0d45a6f8958e8d8b6eb4e5da1ee3e655d0`。
+- 固定测试套件：`0a7edebf3991a7cf8326eb125b7bf88374a5298c`。
+- 覆盖升级起始版本：`ab37baf98ec76f88b6204ac86ddb8d5d9f0fd03f`。
+
+| 真实环境 | 契约单元测试 | 实际脚本测试 | 结果 |
+|---|---:|---|---|
+| Arch Linux | 19 项 | 缺依赖 3 项；安装生命周期及启动 17 项 | 通过 |
+| Ubuntu 26.04 | 19 项 | 缺依赖 3 项；安装生命周期及启动 17 项 | 通过 |
+| Debian 13 | 19 项 | 缺依赖 3 项；安装生命周期及启动 17 项 | 通过 |
+| Ubuntu 24.04 | 19 项 | 缺依赖 3 项；旧依赖拒绝 3 项 | 通过（预期安装失败） |
+
+Ubuntu 24.04 实测 Qt 6.4.2，正确返回 DEPENDENCY_UNSATISFIED，Qt6Core 的 installed 为 6.4.2、required 为 >=6.8、reason 为 version_too_old，未创建应用目录。这不是 Ubuntu 24.04 成功安装认证。
+
+失败用例涵盖无效版本、缺 Python/依赖、旧依赖、下载/编译错误、锁冲突、权限拒绝、非托管桌面入口冲突；契约测试还注入校验、暂存/发布、取消和卸载失败，验证最终结果与退出码和旧版本保护。首次测试发现 Ubuntu/Debian 成功夹具缺 SVG 独立插件，补齐后通过；同时修正安装器对旧 Qt 错报 missing 的诊断。
+
+启动冒烟测试仅在隔离环境运行 offscreen/software Qt，检查存活和 QML 启动错误，不模拟交互、不截图，不替代桌面、GPU、声音和视觉验收。
