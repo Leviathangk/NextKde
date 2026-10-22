@@ -6,6 +6,7 @@ import "../../../../shared/qml/i18n"
 TestCase {
     name: "SpatialServices"
     when: windowShown
+    visible: true
     width: 760
     height: 300
     QtObject {
@@ -29,7 +30,7 @@ TestCase {
     function init() {
         bridge.starts = 0
         bridge.stops = 0
-        I18n.setLanguage("en")
+        I18n.language = "en"
     }
     function snapshot(state) { bridge.wallpaperSnapshotChanged({spatialResources: state}) }
 
@@ -43,14 +44,14 @@ TestCase {
         compare(action.text, "Get")
         verify(action.enabled)
         verify(waitForRendering(page))
-        mouseClick(action)
+        mouseClick(action, action.width / 2, action.height / 2)
         compare(bridge.starts, 1)
         compare(action.text, "Get") // no optimistic completion
         snapshot({available: true, enabled: false, busy: true, progress: 0.5})
         compare(action.enabled, false)
         compare(findChild(page, "spatialServiceProgress").value, 0.5)
         verify(waitForRendering(page))
-        mouseClick(action)
+        mouseClick(action, action.width / 2, action.height / 2)
         compare(bridge.starts, 1)
         snapshot({available: true, enabled: true, ready: true})
         compare(action.text, "Disable")
@@ -60,7 +61,7 @@ TestCase {
         snapshot({available: true, enabled: false, ready: true})
         compare(action.text, "Enable")
         verify(waitForRendering(page))
-        mouseClick(action)
+        mouseClick(action, action.width / 2, action.height / 2)
         compare(bridge.starts, 2)
     }
     function test_unavailable_and_retry() {
@@ -75,7 +76,7 @@ TestCase {
         compare(findChild(page, "spatialServiceError").text, "Download failed")
         verify(action.enabled)
         verify(waitForRendering(page))
-        mouseClick(action)
+        mouseClick(action, action.width / 2, action.height / 2)
         compare(bridge.starts, 1)
         snapshot({available: true, busy: true, progress: -1})
         verify(findChild(page, "spatialServiceProgress").indeterminate)
@@ -94,7 +95,7 @@ TestCase {
         ]
     }
     function test_appearance(data) {
-        I18n.setLanguage(data.language)
+        I18n.language = data.language
         const page = createTemporaryObject(factory, this, {bridge: bridge, colors: data.colors, width: data.width})
         snapshot({available: true, enabled: false, ready: false})
         verify(waitForRendering(page))

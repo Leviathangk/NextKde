@@ -1,0 +1,44 @@
+name: Settings extensions UI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/settings/ServicesSettingsPage.qml'
+      - 'apps/settings/components/ExtensionEntry.qml'
+      - 'apps/settings/tests/services/**'
+      - 'shared/qml/controls/**'
+      - 'shared/qml/i18n/**'
+      - '.github/workflows/settings-extensions.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: settings-extensions-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extensions:
+    runs-on: ubuntu-24.04
+    container: archlinux:base
+    steps:
+      - name: Install QML runtime
+        run: pacman -Syu --noconfirm --needed git qt6-declarative qt6-svg
+      - uses: actions/checkout@v7
+      - name: Check catalogue actions and render previews
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: |
+          /usr/lib/qt6/bin/qmltestrunner \
+            -input apps/settings/tests/services/tst_services.qml \
+            -o extensions-results.txt,txt -o extensions-results.xml,junitxml
+      - name: Upload results and previews
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: extensions-preview
+          path: |
+            extensions-results.*
+            extensions-*.png

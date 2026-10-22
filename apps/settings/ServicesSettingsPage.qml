@@ -92,7 +92,7 @@ ColumnLayout {
                     radius: 2
                     color: page.colors.accent
                     SequentialAnimation on opacity {
-                        running: page.resources.busy && !(Number(page.resources.progress) >= 0)
+                        running: !!page.resources.busy && !(Number(page.resources.progress) >= 0)
                         loops: Animation.Infinite
                         NumberAnimation { from: 0.4; to: 1; duration: 650 }
                         NumberAnimation { from: 1; to: 0.4; duration: 650 }
