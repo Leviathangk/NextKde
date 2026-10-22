@@ -11,7 +11,7 @@ on:
       scope:
         description: Checks to execute
         type: choice
-        options: [all, tray]
+        options: [all, tray, extensions]
         default: all
 
 # A superseded run on the same branch tells us nothing, so cancel it.
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   source-release:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope != 'tray' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope == 'all' }}
     name: source release selection
     runs-on: ubuntu-24.04
     steps:
@@ -40,7 +40,7 @@ jobs:
           python3 tools/check-docs.py
 
   tests:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope != 'tray' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope == 'all' }}
     name: data + platform + logic + headless
     runs-on: ubuntu-24.04
     env:
@@ -168,7 +168,7 @@ jobs:
             .build/tests/CMakeFiles/CMakeConfigureLog.yaml
 
   kwin-plugins:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope != 'tray' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope == 'all' }}
     name: KWin ${{ matrix.series }} SDK build and offline checks
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -292,7 +292,7 @@ jobs:
             .build/glass/CMakeFiles/CMakeConfigureLog.yaml
 
   applications:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope != 'tray' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.scope == 'all' }}
     name: Calendar Calculator Weather build and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -369,3 +369,28 @@ jobs:
           name: tray-results
           path: .build/tray-results/
           if-no-files-found: warn
+
+  extensions:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.scope == 'extensions' }}
+    runs-on: ubuntu-24.04
+    container: archlinux:base
+    steps:
+      - name: Install QML runtime
+        run: pacman -Syu --noconfirm --needed git qt6-declarative qt6-svg
+      - uses: actions/checkout@v7
+      - name: Check catalogue actions and render previews
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: |
+          /usr/lib/qt6/bin/qmltestrunner \
+            -input apps/settings/tests/services/tst_services.qml \
+            -o extensions-results.txt,txt -o extensions-results.xml,junitxml
+      - name: Upload results and previews
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: extensions-preview
+          path: |
+            extensions-results.*
+            extensions-*.png
