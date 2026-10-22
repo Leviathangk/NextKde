@@ -2,7 +2,7 @@
 
 The Settings application reads `catalog.json` from the same resource tree as its
 QML entry point. The current catalogue pins KMusic commit
-`34740755ef298f02d1de9545b533b6cbf031f7d9` and both installer hashes.
+`49264b0d45a6f8958e8d8b6eb4e5da1ee3e655d0` and both installer hashes.
 Use `release: null` when no installation revision is approved. Do not substitute
 a branch, `latest`, a local checkout path or an unreviewed commit.
 Pinning the installer does not mean the end-to-end store workflow has passed VM acceptance.
