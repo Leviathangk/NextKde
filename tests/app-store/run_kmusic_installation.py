@@ -41,7 +41,7 @@ try:
     if a.mode in ['missing','old']:
         r=call('dependency-failure',['install','--version',a.revision],11,'DEPENDENCY_UNSATISFIED')
         check(bool(r.get('details',{}).get('dependencies')),'no dependency list')
-        if a.mode=='old': check(any('Qt6' in d['id'] for d in r['details']['dependencies']),'old Qt not detected')
+        if a.mode=='old': check(any(d['id']=='Qt6Core' and d['reason']=='version_too_old' and d['installed'] for d in r['details']['dependencies']),'old Qt not detected')
         check(not root.exists(),'failure changed application directory')
     else:
         call('preflight',['check'],0,'OK')
