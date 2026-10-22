@@ -3,6 +3,13 @@
 // 规则：值必须与改造前界面上的中文逐字一致（含空格、间隔符与省略号），
 // 改动文案时同步更新对应键，不要只改一边。
 export const catalog = {
+    "Ready to enable": "已下载，可随时启用",
+    "Enabled": "已启用",
+    "Get": "获取",
+    "Enable": "启用",
+    "Disable": "停用",
+    "Checking…": "正在检查…",
+    "Add depth and motion to your wallpaper": "让壁纸呈现立体层次与动态效果",
     "Usage history": "流量历史",
     "Connectivity history": "连接历史",
     "Interface": "网络接口",
@@ -677,7 +684,7 @@ export const catalog = {
     "Integration status": "接入状态",
     "Glass debugging": "玻璃调试",
     "Wallpaper": "壁纸",
-    "Services and components": "服务和组件",
+    "Extensions and services": "扩展与服务",
     "kos-settings developer hot-reload mode": "kos-settings 开发者热更新模式",
     "differs from the install mode loaded by the launcher": "和启动台加载的安装模式不一样",
     "Lithe": "轻盈",
@@ -984,7 +991,7 @@ export const catalog = {
     "Restores the Plasma wallpaper when KOS wallpaper is turned off. Enabling spatial wallpaper pauses auto-switching.": "关闭 KOS 壁纸后恢复 Plasma 壁纸。开启空间壁纸会暂停自动切换。",
     "The current platform service version does not support wallpaper takeover; please update first.": "当前平台服务版本不支持壁纸接管，请更新后再使用。",
     "Checking the spatial wallpaper model…": "正在检查空间壁纸模型…",
-    "Preparing spatial wallpaper; cancel from the preview or Services and components…": "正在准备空间壁纸，可在预览或服务和组件中取消…",
+    "Preparing spatial wallpaper; cancel from the preview or Extensions and services…": "正在准备空间壁纸，可在预览或扩展与服务中取消…",
     "Wallpaper type": "壁纸类型",
     "Images": "图像",
     "Switch interval": "切换频率",

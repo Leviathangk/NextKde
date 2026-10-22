@@ -231,7 +231,7 @@ ApplicationWindow {
             subtitle: I18n.tr("Wallpaper")
         },
         {
-            subtitle: I18n.tr("Services and components")
+            subtitle: I18n.tr("Extensions and services")
         },
         {
             subtitle: I18n.tr("Stage scheduling")
@@ -594,7 +594,7 @@ ApplicationWindow {
                         SidebarEntry {
                             Layout.fillWidth: true
                             pageIndex: 9
-                            label: I18n.tr("Services and components")
+                            label: I18n.tr("Extensions and services")
                             navSymbol: "◇"
                             navTint: "#5ac8fa"
                         }

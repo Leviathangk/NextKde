@@ -163,6 +163,7 @@ jobs:
           if-no-files-found: warn
           path: |
             .build/tests/test-results/
+            .build/tests/apps/settings/extensions-*.png
             .build/tests/Testing/Temporary/
             .build/tests/CMakeFiles/CMakeConfigureLog.yaml
 
