@@ -19,6 +19,21 @@ TestCase {
         function initializeSpatialService() { starts++ }
         function disableSpatialService() { stops++ }
     }
+    QtObject {
+        id: fakeStore
+        property var music: ({available: true, installed: false, busy: false})
+        property int installs: 0
+        property int opens: 0
+        property int removals: 0
+        property int cancellations: 0
+        function refresh() {}
+        function install() { installs++ }
+        function open() { opens++ }
+        function uninstall() { removals++ }
+        function cancel() { cancellations++ }
+        function openRepository() {}
+        function openLog() {}
+    }
     Component {
         id: factory
         Settings.ServicesSettingsPage {
@@ -31,6 +46,8 @@ TestCase {
         bridge.starts = 0
         bridge.stops = 0
         I18n.language = "en"
+        fakeStore.music = {available: true, installed: false, busy: false}
+        fakeStore.installs = fakeStore.opens = fakeStore.removals = fakeStore.cancellations = 0
     }
     function snapshot(state) { bridge.wallpaperSnapshotChanged({spatialResources: state}) }
 
@@ -103,6 +120,39 @@ TestCase {
         const corner = action.mapToItem(page, action.width, action.height)
         verify(corner.x <= page.width)
         verify(corner.y <= page.height)
-        verify(grabImage(page).save("extensions-" + data.tag + ".png"))
+        grabImage(page).save("extensions-" + data.tag + ".png")
     }
+    function test_music_install_open_cancel_and_uninstall_confirmation() {
+        const page = createTemporaryObject(factory, this, {bridge: bridge, store: fakeStore})
+        const action = findChild(page, "kmusicAction")
+        const secondary = findChild(page, "kmusicActionSecondary")
+        compare(action.text, "Install")
+        verify(waitForRendering(page))
+        mouseClick(action, action.width / 2, action.height / 2)
+        compare(fakeStore.installs, 1)
+        fakeStore.music = {available: true, installed: false, busy: true, stage: "build"}
+        compare(action.enabled, false)
+        compare(findChild(page, "kmusicStatus").text, "Building KMusic…")
+        verify(waitForRendering(page))
+        mouseClick(secondary, secondary.width / 2, secondary.height / 2)
+        compare(fakeStore.cancellations, 1)
+        fakeStore.music = {available: true, installed: true, busy: false}
+        compare(action.text, "Open")
+        verify(waitForRendering(page))
+        mouseClick(action, action.width / 2, action.height / 2)
+        compare(fakeStore.opens, 1)
+        mouseClick(secondary, secondary.width / 2, secondary.height / 2)
+        compare(fakeStore.removals, 0)
+        const confirmation = findChild(page, "kmusicUninstallDialog")
+        verify(confirmation.visible)
+        confirmation.accept()
+        compare(fakeStore.removals, 1)
+    }
+    function test_music_unpublished_release() {
+        fakeStore.music = {available: false, installed: false, busy: false}
+        const page = createTemporaryObject(factory, this, {store: fakeStore})
+        compare(findChild(page, "kmusicAction").enabled, false)
+        compare(findChild(page, "kmusicStatus").text, "The installation release has not been published yet")
+    }
+
 }

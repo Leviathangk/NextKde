@@ -34,6 +34,8 @@ jobs:
 
       - name: Test release selection without installing the desktop
         run: python3 -m unittest discover -s tools/tests -p 'test_*release*.py'
+      - name: Check KMusic catalogue preparation
+        run: python3 -m unittest discover -s tools/tests -p 'test_kmusic_catalog.py'
       - name: Check project contracts and documentation
         run: |
           python3 platform/tests/test_contract.py
@@ -376,7 +378,7 @@ jobs:
     container: archlinux:base
     steps:
       - name: Install QML runtime
-        run: pacman -Syu --noconfirm --needed git qt6-declarative qt6-svg
+        run: pacman -Syu --noconfirm --needed git qt6-declarative qt6-svg ttf-dejavu noto-fonts-cjk
       - uses: actions/checkout@v7
       - name: Check catalogue actions and render previews
         env:

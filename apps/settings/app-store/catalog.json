@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "kmusic": {
+    "appId": "org.nextkde.KMusic",
+    "repository": "https://github.com/NextKde/KMusic",
+    "release": {
+      "revision": "34740755ef298f02d1de9545b533b6cbf031f7d9",
+      "sha256": {
+        "install.sh": "c5f01cb43def8f1b26dead05eda11282b71817e5dd6ece339329afb70bec0bf7",
+        "packaging/installer.py": "ad9fbf9ace573a7621cd9036a02cfba4c8639c3218fb8556ae6d89e28cdd5dc4"
+      }
+    }
+  }
+}
