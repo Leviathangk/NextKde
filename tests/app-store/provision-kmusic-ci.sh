@@ -12,7 +12,7 @@ else
         apt-get install -y --no-install-recommends build-essential python3 git cmake pkg-config curl ca-certificates xz-utils qt6-base-dev qt6-declarative-dev
     else
     apt-get install -y --no-install-recommends build-essential python3 git cmake pkg-config curl ca-certificates xz-utils \
-      qt6-base-dev qt6-declarative-dev qt6-svg-dev qt6-shadertools-dev qt6-5compat-dev qt6-wayland libqt6sql6-sqlite \
+      qt6-base-dev qt6-declarative-dev qt6-svg-dev qt6-svg-plugins qt6-shadertools-dev qt6-5compat-dev qt6-wayland libqt6sql6-sqlite \
       qtkeychain-qt6-dev libqrencode-dev libtag1-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
       gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav \
       qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \

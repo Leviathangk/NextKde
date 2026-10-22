@@ -112,6 +112,17 @@ class InstallerContract(unittest.TestCase):
         with patch.object(i.fcntl,'flock',side_effect=BlockingIOError): self.assertEqual(self.invoke(['check'])[0],13)
     def test_cancelled_returns_result(self):
         with patch.object(i,'dependencies',side_effect=KeyboardInterrupt): self.assertEqual(self.invoke(['check'])[0],130)
+    def test_corrupt_manifest_reports_internal_error(self):
+        self.root.mkdir(parents=True); (self.root/'manifest.json').write_text('{bad')
+        self.assertEqual(self.invoke(['status'])[0],99)
+    def test_uninstall_failure_reported(self):
+        self.install()
+        with patch.object(i.shutil,'rmtree',side_effect=OSError('injected delete failure')):
+            self.assertEqual(self.invoke(['uninstall'])[0],32)
+    def test_missing_current_is_repaired(self):
+        self.install(); (self.root/'current').unlink()
+        self.assertEqual(self.install()[1]['code'],'INSTALLED')
+        self.assertTrue((self.root/'current/bin/kmusic').exists())
     def test_permission_failure(self):
         with patch.object(i.pathlib.Path,'mkdir',side_effect=PermissionError): self.assertEqual(self.invoke(['check'])[0],12)
 

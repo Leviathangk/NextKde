@@ -66,6 +66,23 @@ try:
         linked=subprocess.run(['ldd',str(root/'current/bin/kmusic')],capture_output=True,text=True)
         (results/'ldd.txt').write_text(linked.stdout+linked.stderr)
         check(linked.returncode==0 and 'not found' not in linked.stdout,'installed binary has unresolved dynamic dependencies')
+        # Startup smoke only: isolated data, no GUI interaction or visual acceptance.
+        runtime=work/'runtime'; runtime.mkdir(mode=0o700)
+        smokeenv=env.copy(); smokeenv.update(QT_QPA_PLATFORM='offscreen',QT_QUICK_BACKEND='software',XDG_RUNTIME_DIR=str(runtime),KOS_MUSIC_DATA_DIR=str(work/'smoke-data'),KOS_MUSIC_CACHE_DIR=str(work/'smoke-cache'))
+        with (results/'startup.log').open('w') as output:
+            app=subprocess.Popen([str(root/'current/bin/kmusic')],env=smokeenv,stdout=output,stderr=subprocess.STDOUT)
+            try:
+                time.sleep(5)
+                check(app.poll() is None,'installed application exited during startup')
+            finally:
+                if app.poll() is None:
+                    app.terminate()
+                    try: app.wait(timeout=10)
+                    except subprocess.TimeoutExpired: app.kill(); app.wait()
+        startup=(results/'startup.log').read_text()
+        for fatal in ['QQmlApplicationEngine failed to load component','is not installed','ReferenceError:','TypeError:','Cannot assign to non-existent property']:
+            check(fatal not in startup,'installed QML startup error: '+fatal)
+        records.append(dict(name='installed-startup-smoke',passed=True))
         sentinel=home/'data/kmusic/user-library.db'; sentinel.parent.mkdir(); sentinel.write_text('preserve me')
         lock=(home/'state/kmusic-installer/lock').open('a'); fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         call('concurrent-lock',['check'],13,'INSTALL_BUSY'); lock.close()
